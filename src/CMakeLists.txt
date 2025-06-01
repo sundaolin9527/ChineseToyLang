@@ -27,10 +27,10 @@ target_include_directories(utils PUBLIC
 )
 
 # 驱动程序和主入口
-add_executable(ChineseToyCompiler
+add_executable(ChineseToyLang
     main.c
 )
-target_link_libraries(ChineseToyCompiler PRIVATE frontend utils)
+target_link_libraries(ChineseToyLang PRIVATE frontend utils)
 
 # 可选：生成编译器版本信息
 configure_file(

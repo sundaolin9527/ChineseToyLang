@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# 可执行文件的名字
+EXENAME="ChineseToyLang"
+
 # 获取脚本所在绝对路径
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR}"
@@ -34,10 +37,10 @@ echo "开始编译..."
 make -j$(nproc)
 
 # 查找可执行文件
-EXECUTABLE=$(find "${BUILD_DIR}" -name ChineseToyCompiler -type f -executable | head -n 1)
+EXECUTABLE=$(find "${BUILD_DIR}" -name "${EXENAME}" -type f -executable | head -n 1)
 
 if [ -z "${EXECUTABLE}" ]; then
-    echo "错误: 未找到可执行文件ChineseToyCompiler"
+    echo "错误: 未找到可执行文件${EXENAME}"
     exit 1
 fi
 
