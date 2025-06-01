@@ -1,1 +1,0 @@
-/usr/bin/cc CMakeFiles/elang.dir/main.c.o -o elang  libfrontend.a libutils.a 

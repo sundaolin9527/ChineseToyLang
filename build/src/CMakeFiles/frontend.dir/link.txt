@@ -1,2 +1,0 @@
-/usr/bin/ar qc libfrontend.a CMakeFiles/frontend.dir/frontend/lexer/lexer.c.o CMakeFiles/frontend.dir/frontend/parser/parser.c.o CMakeFiles/frontend.dir/frontend/ast/ast.c.o CMakeFiles/frontend.dir/frontend/sema/sema.c.o
-/usr/bin/ranlib libfrontend.a
