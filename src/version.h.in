@@ -1,0 +1,6 @@
+#ifndef ELANG_VERSION_H
+#define ELANG_VERSION_H
+
+#define ELANG_VERSION "@ELANG_VERSION@"
+
+#endif
