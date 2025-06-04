@@ -5,30 +5,38 @@
 
 /* 抽象语法树节点类型 */
 typedef enum {
-    AST_PROGRAM,
-    AST_VAR_DECL, 
-    AST_FUNC_DECL, 
-    AST_EXPR_STMT,
-    AST_IF, AST_FOR, 
-    AST_WHILE, 
-    AST_BREAK,
-    AST_CONTINUE,
-    AST_RETURN,
-    AST_BLOCK, 
-    AST_IMPORT, 
-    AST_EXPORT,
-    AST_LITERAL, 
-    AST_IDENTIFIER, 
-    AST_BINARY_EXPR,
-    AST_UNARY_EXPR, 
-    AST_ASSIGNMENT, 
-    AST_CALL,
-    AST_ARRAY_ACCESS, 
-    AST_OBJECT_ACCESS, 
-    AST_ANONYMOUS_FUNC,
-    AST_STRUCT_DECL,
-    AST_UNION_DECL,
-    AST_MEMBER_DECL,       // 普通成员
+    // ========== 程序结构 ==========
+    AST_PROGRAM,       // 程序根节点，包含所有顶层语句（如函数、变量声明等）
+
+    // ========== 声明类节点 ==========
+    AST_VAR_DECL,      // 变量声明，如 `x = 10;` 或 `y;`（声明类，不加后缀）
+    AST_FUNC_DECL,     // 函数声明，如 `function foo() { ... }`（声明类，不加后缀）
+    AST_STRUCT_DECL,   // 结构体声明，如 `struct Point { x; y; }`
+    AST_UNION_DECL,    // 联合体声明，如 `union Data { i; f; }`
+    AST_MEMBER_DECL,   // 结构体/联合体的成员声明，如 `x`（在 `struct` 内部使用）
+
+    // ========== 语句类节点 ==========
+    AST_BLOCK_STMT,    // 代码块 `{ ... }`，包含一组语句（语句块）
+    AST_EXPR_STMT,     // 表达式语句，如 `x + 1;`（表达式后加分号）
+    AST_IF_STMT,       // `if` 条件语句，如 `if (cond) { ... } else { ... }`
+    AST_FOR_STMT,      // `for` 循环，如 `for (i = 0; i < 10; i++) { ... }`
+    AST_WHILE_STMT,    // `while` 循环，如 `while (cond) { ... }`
+    AST_BREAK_STMT,    // `break` 语句，用于跳出循环
+    AST_CONTINUE_STMT, // `continue` 语句，用于跳过当前循环迭代
+    AST_RETURN_STMT,   // `return` 语句，如 `return x + 1;`
+    AST_IMPORT_STMT,   // `import` 语句，如 `import "module"`
+    AST_EXPORT_STMT,   // `export` 语句，如 `export function foo() { ... }`
+
+    // ========== 表达式类节点（可计算值） ==========
+    AST_LITERAL_EXPR,      // 字面量，如 `42`, `3.14`, `"hello"`, `true`
+    AST_IDENTIFIER_EXPR,   // 标识符（变量名），如 `x`, `myVar`
+    AST_BINARY_EXPR,       // 二元运算，如 `a + b`, `x > y`, `a && b`（已含 _EXPR）
+    AST_UNARY_EXPR,        // 一元运算，如 `-x`, `!flag`, `++i`（已含 _EXPR）
+    AST_ASSIGNMENT_EXPR,   // 赋值，如 `x = 10`（可能返回赋值后的值）
+    AST_CALL_EXPR,         // 函数调用，如 `foo(1, 2)`（已含 _EXPR，调整为 _EXPR 后缀）
+    AST_ARRAY_ACCESS_EXPR, // 数组访问，如 `arr[0]`
+    AST_OBJECT_ACCESS_EXPR,// 对象/结构体字段访问，如 `obj.field`
+    AST_ANONYMOUS_FUNC_EXPR // 匿名函数/闭包，如 `(x) => x + 1`
 } ASTNodeType;
 
 /* 变量声明类型 */
