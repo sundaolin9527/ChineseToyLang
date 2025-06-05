@@ -297,18 +297,42 @@ void print_ast(ASTNode *node, int depth) {
             print_ast(node->expr_stmt.expression, depth + 1);
             break;
             
-        case AST_IF_STMT:
-            printf("IF_STMT\n");
-            print_ast(node->if_stmt.condition, depth + 1);
-            print_ast(node->if_stmt.then_branch, depth + 1);
+        case AST_IF_STMT: {
+            // 判断是否是 elif 分支
+            static int is_elif_context = 0;
+            int was_elif_context = is_elif_context;
+            
+            if (!was_elif_context) {
+                printf("IF_STMT\n");
+            } else {
+                printf("ELIF_STMT\n");
+            }
+
+            // 打印条件
+            for(int i=0; i<depth; i++) printf("  "); 
+            printf("  CONDITION:\n");
+            print_ast(node->if_stmt.condition, depth + 2);
+            
+            // 打印 then 分支
+            for(int i=0; i<depth; i++) printf("  "); 
+            printf("  THEN_BRANCH:\n");
+            print_ast(node->if_stmt.then_branch, depth + 2);
+            
+            // 处理 else/elif 分支
             if (node->if_stmt.else_branch) {
-                for (int i = 0; i < depth; i++) {
-                    printf("  ");
+                if (node->if_stmt.else_branch->type == AST_IF_STMT) {
+                    // 进入 elif 上下文
+                    is_elif_context = 1;
+                    print_ast(node->if_stmt.else_branch, depth);
+                    is_elif_context = 0;
+                } else {
+                    for(int i=0; i<depth; i++) printf("  "); 
+                    printf("ELSE_STMT:\n");
+                    print_ast(node->if_stmt.else_branch, depth + 2);
                 }
-                printf("ELSE_STMT\n");
-                print_ast(node->if_stmt.else_branch, depth + 1);
             }
             break;
+        }
             
         case AST_FOR_STMT:
             printf("FOR_STMT\n");

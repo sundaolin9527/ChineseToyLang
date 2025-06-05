@@ -219,26 +219,61 @@ ASTNode* parse_if_statement(Parser *parser) {
     
     ASTNode *node = new_ast_node(AST_IF_STMT, line, column);
     
-    eat(parser, TOKEN_IF);  // 消耗"如果"
+    eat(parser, TOKEN_IF);  // 消耗"若"
     
+    // 解析条件表达式
     if (parser->current_token->type != TOKEN_LEFT_PAREN) {
         SYNTAX_ERROR_EXIT(parser, "左括号", TOKEN_LEFT_PAREN);
     }
     eat(parser, TOKEN_LEFT_PAREN);
-    
     node->if_stmt.condition = parse_expression(parser);
-    
-    if (parser->current_token->type != TOKEN_RIGHT_PAREN) {
-        SYNTAX_ERROR_EXIT(parser, "右括号", TOKEN_RIGHT_PAREN);
-    }
     eat(parser, TOKEN_RIGHT_PAREN);
     
+    // 解析 then 分支
     node->if_stmt.then_branch = parse_statement(parser);
     
-    node->if_stmt.else_branch = NULL;
-    if (parser->current_token->type == TOKEN_ELSE) {
-        eat(parser, TOKEN_ELSE);
-        node->if_stmt.else_branch = parse_statement(parser);
+    // 处理 elseif 和 else 分支
+    ASTNode *current = node; // 跟踪当前处理的if/elif节点
+    
+    while (parser->current_token->type == TOKEN_ELSE || 
+           parser->current_token->type == TOKEN_ELIF) {
+        
+        if (parser->current_token->type == TOKEN_ELIF) {
+            // 创建新的 elif 节点
+            ASTNode *elif_node = new_ast_node(AST_IF_STMT, 
+                parser->current_token->line, 
+                parser->current_token->column);
+            
+            eat(parser, TOKEN_ELIF);  // 消耗"亦"
+            
+            // 解析 elseif 条件
+            if (parser->current_token->type != TOKEN_LEFT_PAREN) {
+                SYNTAX_ERROR_EXIT(parser, "左括号", TOKEN_LEFT_PAREN);
+            }
+            eat(parser, TOKEN_LEFT_PAREN);
+            elif_node->if_stmt.condition = parse_expression(parser);
+            eat(parser, TOKEN_RIGHT_PAREN);
+            
+            // 解析 elseif 的 then 分支
+            elif_node->if_stmt.then_branch = parse_statement(parser);
+            elif_node->if_stmt.else_branch = NULL;
+            
+            // 将 elif 节点连接到当前节点的 else 分支
+            current->if_stmt.else_branch = elif_node;
+            current = elif_node; // 更新当前节点为新创建的 elif 节点
+            
+            // 继续检查是否还有更多 elseif
+            continue;
+        }
+        
+        // 处理 else 分支
+        if (parser->current_token->type == TOKEN_ELSE) {
+            eat(parser, TOKEN_ELSE);  // 消耗"则"
+            
+            // 确保 else 分支连接到最内层未处理的 if/elif
+            current->if_stmt.else_branch = parse_statement(parser);
+            break;  // else 必须是最后一个分支
+        }
     }
     
     return node;
