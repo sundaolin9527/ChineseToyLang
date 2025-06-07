@@ -49,11 +49,6 @@ static Symbol* getOrCreateSymbol(TypeEnv *env) {
     if (env->idle_symbol) {
         Symbol *symbol = env->idle_symbol;
         env->idle_symbol = (Symbol*)symbol->symbolNode.next;
-        if (symbol->symbolStr != NULL)
-        {
-            free(symbol->symbolStr);
-            symbol->symbolStr = NULL;
-        }
         symbol->type = TYPE_UNKNOWN;
         INIT_LIST_HEAD(&symbol->symbolNode);
         return symbol;
@@ -62,7 +57,6 @@ static Symbol* getOrCreateSymbol(TypeEnv *env) {
     Symbol *symbol = (Symbol*)malloc(sizeof(Symbol));
     if (symbol) {
         INIT_LIST_HEAD(&symbol->symbolNode);
-        symbol->symbolStr = NULL;
         symbol->type = TYPE_UNKNOWN;
     }
     return symbol;
@@ -154,7 +148,8 @@ bool addSymbolToScope(TypeEnv *env, const char *name, Type type) {
     if (head != NULL)
     {
         do{
-            if (existing->symbolStr && strncmp(existing->symbolStr, name, strlen(name)+1) == 0) {
+            if (strncmp(existing->symbolStr, name, strlen(name)+1) == 0 ||
+                existing->type == type) {
                 return true; // 符号已存在
             }
             existing = (Symbol*)existing->symbolNode.next;
@@ -164,8 +159,7 @@ bool addSymbolToScope(TypeEnv *env, const char *name, Type type) {
     // 创建新符号
     Symbol *symbol = getOrCreateSymbol(env);
     if (!symbol) return false;
-    
-    symbol->symbolStr = strdup(name);
+    strncpy(symbol->symbolStr, name, strlen(name)+1);
     symbol->type = type;
     
     // 添加到作用域符号表
@@ -192,7 +186,7 @@ Symbol* findSymbolInScope(TypeEnv *env, const char *name) {
         symbol = currentScope->symbols;
         symbolHead = currentScope->symbols;
         do{
-            if (symbol->symbolStr && strncmp(symbol->symbolStr, name, strlen(name) + 1) == 0) {
+            if (strncmp(symbol->symbolStr, name, strlen(name) + 1) == 0) {
                 return symbol;
             }
             symbol = (Symbol*)symbol->symbolNode.next;
@@ -264,7 +258,7 @@ void printCurrScopeSymbols(TypeEnv *env) {
     } while(symbol != symbolHead);
 }
 
-/**
+
 // 测试函数
 void testTypeEnv() {
     TypeEnv *env = initTypeEnv();
@@ -310,4 +304,4 @@ int main() {
     testTypeEnv();
     return 0;
 }
-     */
+    

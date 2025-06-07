@@ -5,7 +5,7 @@
 #include "../utils/utils.h"
 
 typedef enum Type{
-    TYPE_UNKNOWN,   // 未知类型
+    TYPE_UNKNOWN = 0,   // 未知类型
     TYPE_INT8,      // 1字节整型
     TYPE_INT16,     // 2字节整型
     TYPE_INT32,     // 4字节整型
@@ -25,10 +25,11 @@ typedef enum Type{
 } Type;
 
 // 符号
+#define SYMBOL_SIZE (192)  //最长64个汉字，每个汉字3字节，共192字节
 typedef struct Symbol Symbol;
 struct Symbol {
     Node symbolNode;
-    char *symbolStr; // 符号名
+    char symbolStr[SYMBOL_SIZE+1]; // 符号名
     Type type;       // 符号类型
 };
 
