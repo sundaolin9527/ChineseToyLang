@@ -192,6 +192,7 @@ Symbol* findSymbolInScope(TypeEnv *env, const char *name) {
                 symbolHead = symbol;
                 
                 do{
+                    // 双向循环链表前驱以及后继指针不可能为NULL，因此不用判断
                     if (strncmp(symbol->symbolStr, name, strlen(name) + 1) == 0) {
                         return symbol;
                     }
@@ -319,4 +320,4 @@ int main() {
     testTypeEnv();
     return 0;
 }
-     */
+    */  
