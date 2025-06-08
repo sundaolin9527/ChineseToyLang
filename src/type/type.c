@@ -28,38 +28,49 @@ void cleanupTypeEnv(TypeEnv *env) {
 
 // 从空闲链表获取或创建新作用域
 static Scope* getOrCreateScope(TypeEnv *env) {
+    if (!env) return NULL;
+    Scope *currScope = NULL;
+
     if (env->idle_scope) {
-        Scope *currScope = env->idle_scope;
-        env->idle_scope = (Scope*)(currScope->scopeNode.next);
-        currScope->symbols = NULL;
-        INIT_LIST_HEAD(&currScope->scopeNode);
-        return currScope;
+        currScope = env->idle_scope;
+        Scope *nextScope = LIST_ENTRY(currScope->scopeNode.next, Scope, scopeNode);
+        env->idle_scope = (currScope == nextScope) ? NULL : nextScope;
+        LIST_DELETE(&currScope->scopeNode); //从当前链上摘除
     }
-    
-    Scope *currScope = (Scope*)malloc(sizeof(Scope));
+    else
+    {
+        currScope = (Scope*)malloc(sizeof(Scope));
+    }
+
     if (currScope) {
+        memset(currScope, 0, sizeof(Scope));
         INIT_LIST_HEAD(&currScope->scopeNode);
-        currScope->symbols = NULL;
     }
     return currScope;
 }
 
 // 从空闲链表获取或创建新符号
 static Symbol* getOrCreateSymbol(TypeEnv *env) {
+    if (!env) return NULL;
+    Symbol *currSymbol = NULL;
+
     if (env->idle_symbol) {
-        Symbol *symbol = env->idle_symbol;
-        env->idle_symbol = (Symbol*)symbol->symbolNode.next;
-        symbol->type = TYPE_UNKNOWN;
-        INIT_LIST_HEAD(&symbol->symbolNode);
-        return symbol;
+        currSymbol = env->idle_symbol;
+        Symbol *nextSymbol = LIST_ENTRY(currSymbol->symbolNode.next, Symbol, symbolNode);
+        env->idle_symbol = (currSymbol == nextSymbol) ? NULL : nextSymbol;
+        LIST_DELETE(&currSymbol->symbolNode); //从当前链上摘除
+    }
+    else
+    {
+        currSymbol = (Symbol*)malloc(sizeof(Symbol));
     }
     
-    Symbol *symbol = (Symbol*)malloc(sizeof(Symbol));
-    if (symbol) {
-        INIT_LIST_HEAD(&symbol->symbolNode);
-        symbol->type = TYPE_UNKNOWN;
+    if (currSymbol) {
+        memset(currSymbol, 0, sizeof(Symbol));
+        INIT_LIST_HEAD(&currSymbol->symbolNode);
+        currSymbol->type = TYPE_UNKNOWN;
     }
-    return symbol;
+    return currSymbol;
 }
 
 // 初始化类型环境
@@ -266,7 +277,7 @@ void printCurrScopeSymbols(TypeEnv *env) {
     return;
 }
 
-/**
+
 // 测试函数
 void testTypeEnv() {
     TypeEnv *env = initTypeEnv();
@@ -312,6 +323,7 @@ void testTypeEnv() {
     
     printf("\n=== Exiting global currScope ===\n");
     exitScope(env);
+    printCurrScopeSymbols(env);
     
     freeTypeEnv(&env);
 }
@@ -320,4 +332,3 @@ int main() {
     testTypeEnv();
     return 0;
 }
-    */  

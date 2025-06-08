@@ -66,21 +66,5 @@ do { \
 // 获取外层结构体指针
 #define LIST_ENTRY(ptr, type, member) \
     ((type *)((char *)(ptr) - (unsigned long)(&((type *)0)->member)))
-
-#define LIST_IS_EMPTY(head) (((head)->next) == (head))
-
-// 删除头部节点（返回被删除的节点）
-#define LIST_POP_HEAD(head) \
-    ({ \
-        Node *popped = (head)->next; \
-        if (popped != (head)) { \
-            (head)->next = popped->next; \
-            popped->next->prev = (head); \
-            popped->next = popped; \
-            popped->prev = popped; \
-        } else { \
-            popped = NULL; \
-        } \
-        popped; \
-    })
+    
 #endif /* UTILS_H */ 
