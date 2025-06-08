@@ -37,15 +37,15 @@ struct Symbol {
 typedef struct Scope Scope;
 struct Scope {
     Node scopeNode;
-    Symbol *symbols; // 该作用域的符号表
+    Node symbols; // 该作用域的所有符号表, 存放Symbol
 };
 
 // 类型环境
 typedef struct TypeEnv TypeEnv;
 struct TypeEnv {
-    Scope *currScope;  // 当前作用域栈顶
-    Scope *idle_scope; // 空闲作用域链表
-    Symbol *idle_symbol; // 空闲符号链表
+    Node scopeHead;  // 作用域栈，存放Scope, 当前作用域是链尾
+    Node idle_scope; // 空闲作用域链表，存放Scope
+    Node idle_symbol; // 空闲符号链表，存放Symbol
 };
 
 TypeEnv *initTypeEnv();

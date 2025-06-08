@@ -6,45 +6,26 @@
 
 // 清理类型环境
 void cleanupTypeEnv(TypeEnv *env) {
-    if (!env || !env->currScope) return;
-    if (env->idle_scope != NULL)
-    {
-        LIST_FREE(env->idle_scope, Scope, scopeNode);
-    }
+    if (!env) return;
 
-    if (env->idle_symbol != NULL)
-    {
-        LIST_FREE(env->idle_symbol, Symbol, symbolNode);
-    } 
-    
-    if (env->currScope->symbols != NULL)
-    {
-        LIST_FREE(env->currScope->symbols, Symbol, symbolNode);
-    }
-
-    LIST_FREE((env->currScope), Scope, scopeNode);
+    LIST_FREE(&(env->scopeHead), Scope, scopeNode);
+    LIST_FREE(&(env->idle_scope), Scope, scopeNode);
+    LIST_FREE(&(env->idle_symbol), Symbol, symbolNode);
     return;
 }
 
 // 从空闲链表获取或创建新作用域
 static Scope* getOrCreateScope(TypeEnv *env) {
     if (!env) return NULL;
-    Scope *currScope = NULL;
 
-    if (env->idle_scope) {
-        currScope = env->idle_scope;
-        Scope *nextScope = LIST_ENTRY(currScope->scopeNode.next, Scope, scopeNode);
-        env->idle_scope = (currScope == nextScope) ? NULL : nextScope;
-        LIST_DELETE(&currScope->scopeNode); //从当前链上摘除
-    }
-    else
-    {
-        currScope = (Scope*)malloc(sizeof(Scope));
-    }
-
+    Node *node = LIST_POP_HEAD(&(env->idle_scope));
+    Scope *currScope = (node == NULL) ? (Scope*)malloc(sizeof(Scope)) 
+                       : LIST_ENTRY(node, Scope, scopeNode);
+    
     if (currScope) {
         memset(currScope, 0, sizeof(Scope));
-        INIT_LIST_HEAD(&currScope->scopeNode);
+        INIT_LIST_HEAD(&(currScope->scopeNode));
+        INIT_LIST_HEAD(&(currScope->symbols));
     }
     return currScope;
 }
@@ -52,22 +33,14 @@ static Scope* getOrCreateScope(TypeEnv *env) {
 // 从空闲链表获取或创建新符号
 static Symbol* getOrCreateSymbol(TypeEnv *env) {
     if (!env) return NULL;
-    Symbol *currSymbol = NULL;
 
-    if (env->idle_symbol) {
-        currSymbol = env->idle_symbol;
-        Symbol *nextSymbol = LIST_ENTRY(currSymbol->symbolNode.next, Symbol, symbolNode);
-        env->idle_symbol = (currSymbol == nextSymbol) ? NULL : nextSymbol;
-        LIST_DELETE(&currSymbol->symbolNode); //从当前链上摘除
-    }
-    else
-    {
-        currSymbol = (Symbol*)malloc(sizeof(Symbol));
-    }
+    Node *node = LIST_POP_HEAD(&(env->idle_symbol));
+    Symbol *currSymbol = (node == NULL) ? (Symbol*)malloc(sizeof(Symbol)) 
+                       : LIST_ENTRY(node, Symbol, symbolNode);
     
     if (currSymbol) {
         memset(currSymbol, 0, sizeof(Symbol));
-        INIT_LIST_HEAD(&currSymbol->symbolNode);
+        INIT_LIST_HEAD(&(currSymbol->symbolNode));
         currSymbol->type = TYPE_UNKNOWN;
     }
     return currSymbol;
@@ -78,6 +51,9 @@ TypeEnv *initTypeEnv() {
     TypeEnv *typeEnv = (TypeEnv*)malloc(sizeof(TypeEnv));
     if (typeEnv) {
         memset(typeEnv, 0, sizeof(TypeEnv));
+        INIT_LIST_HEAD(&(typeEnv->scopeHead));
+        INIT_LIST_HEAD(&(typeEnv->idle_scope));
+        INIT_LIST_HEAD(&(typeEnv->idle_symbol));
     }
     return typeEnv;
 }
@@ -102,69 +78,45 @@ void enterScope(TypeEnv *env) {
     if (!newScope) return;
 
     // 将新作用域压入栈顶
-    if (env->currScope) {
-        LIST_INSERT_TAIL(&(env->currScope->scopeNode) , &newScope->scopeNode);
-    }
-    env->currScope = newScope;
+    LIST_INSERT_TAIL(&(env->scopeHead) , &(newScope->scopeNode));
     return;
 }
 
 // 离开当前作用域
 void exitScope(TypeEnv *env) {
-    if (!env || !env->currScope) return;
+    if (!env || LIST_IS_EMPTY(&(env->scopeHead))) return;
     
-    Scope *currentScope = env->currScope;
-    
-    // 将符号移动到空闲链表
-    Symbol *symbol = currentScope->symbols;
-    if (symbol != NULL){
-        if (env->idle_symbol != NULL)
-        {
-            LIST_INSERT_TAIL(&(env->idle_symbol->symbolNode), &symbol->symbolNode);
-        }
-        else
-        {
-            env->idle_symbol = symbol;
-        }
-    }
-    
-    // 更新作用域栈
-    if (currentScope->scopeNode.next != &currentScope->scopeNode) {
-        LIST_DELETE(&currentScope->scopeNode); //只是从env->currScope链上摘除，并没有释放内存
-    } else {
-        //当前作用域只有1个
-        env->currScope = NULL;
-    }
+    // 离开当前作用域
+    Node *node = LIST_POP_TAIL(&(env->scopeHead));
 
-    if (env->idle_scope != NULL)
-    {
-        // 将作用域移动到空闲链表
-        LIST_INSERT_TAIL(&(env->idle_scope->scopeNode), &currentScope->scopeNode);
-    }
-    else
-    {
-        env->idle_scope = currentScope;
-    }
+    // 将符号移动到空闲链表
+    Scope *currentScope = LIST_ENTRY(node, Scope, scopeNode);
+    LIST_TRANSFER_ALL_TAIL(&(env->idle_symbol), &(currentScope->symbols));
+
+    // 将作用域移动到空闲链表
+    LIST_INSERT_TAIL(&(env->idle_scope), &(currentScope->scopeNode));
     
     return;
 }
 
 // 在当前作用域添加符号
 bool addSymbolToScope(TypeEnv *env, const char *name, Type type) {
-    if (!env || !env->currScope || !name) return false;
+    if (!env || LIST_IS_EMPTY(&(env->scopeHead)) || !name) return false;
     
     // 检查符号是否已存在
-    Symbol *head = env->currScope->symbols;
-    Symbol *existing = head;
-    if (head != NULL)
+    Node *scopeHead = LIST_PEEK_TAIL(&(env->scopeHead));
+    Scope *currentScope = LIST_ENTRY(scopeHead, Scope, scopeNode);
     {
-        do{
+        Node *pos, *next;
+        Symbol *existing = NULL;
+        LIST_FOREACH_SAFE(&(currentScope->symbols), pos, next)
+        {
+            existing = LIST_ENTRY(pos, Symbol, symbolNode);
             if (strncmp(existing->symbolStr, name, strlen(name)+1) == 0 &&
                 existing->type == type) {
                 return true; // 符号已存在
             }
-            existing = LIST_ENTRY(existing->symbolNode.next, Symbol, symbolNode);
-        }while(existing != head);
+        }
     }
 
     // 创建新符号
@@ -172,65 +124,35 @@ bool addSymbolToScope(TypeEnv *env, const char *name, Type type) {
     if (!symbol) return false;
     strncpy(symbol->symbolStr, name, strlen(name)+1);
     symbol->type = type;
-    
+
     // 添加到作用域符号表
-    if (env->currScope->symbols) {
-        LIST_INSERT_TAIL(&(env->currScope->symbols->symbolNode), &symbol->symbolNode);
-    }
-    else
-    {
-        env->currScope->symbols = symbol;
-    }
+    LIST_INSERT_TAIL(&(currentScope->symbols), &(symbol->symbolNode));
     
     return true;
 }
 
 // 查找符号（从当前作用域向外查找）
 Symbol* findSymbolInScope(TypeEnv *env, const char *name) {
-    if (!env || !name) return NULL;
+    if (!env || LIST_IS_EMPTY(&(env->scopeHead)) || !name) return NULL;
     
-    Scope *currentScope = env->currScope;
-    Scope *currentScopeHead = env->currScope;
-    Symbol *symbol = NULL;
-    Symbol *symbolHead = NULL;
-    if (currentScope != NULL)
+    Scope *currentScope = NULL;
+    Symbol *currentSymbol = NULL;
+    Node *posScope, *prevScope;
+    Node *posSymbol, *prevSymbol;
+    LIST_FOREACH_REVERSE_SAFE(&(env->scopeHead), posScope, prevScope)
     {
-        do{
-            if (currentScope->symbols != NULL)
-            {
-                // 从最新的开始遍历
-                symbol = LIST_ENTRY((currentScope->symbols->symbolNode.prev), Symbol, symbolNode);
-                symbolHead = symbol;
-                
-                do{
-                    // 双向循环链表前驱以及后继指针不可能为NULL，因此不用判断
-                    if (strncmp(symbol->symbolStr, name, strlen(name) + 1) == 0) {
-                        return symbol;
-                    }
-                    symbol = LIST_ENTRY(symbol->symbolNode.prev, Symbol, symbolNode);
-                } while(symbol != symbolHead);
+        currentScope = LIST_ENTRY(posScope, Scope, scopeNode);
+        // 从最新的符号开始查找
+        LIST_FOREACH_REVERSE_SAFE(&(currentScope->symbols), posSymbol, prevSymbol)
+        {
+            currentSymbol = LIST_ENTRY(posSymbol, Symbol, symbolNode);
+            if (strncmp(currentSymbol->symbolStr, name, strlen(name) + 1) == 0) {
+                return currentSymbol;
             }
-            // 移动到上一层作用域
-            currentScope = LIST_ENTRY(currentScope->scopeNode.prev, Scope, scopeNode);
-        } while(currentScope != currentScopeHead);
+        }
     }
 
     return NULL;
-}
-
-void freeSymbol(Symbol *symbol, TypeEnv *env) {
-    if (!symbol || !env) return;
-    LIST_FREE(symbol, Symbol, symbolNode);
-    symbol = NULL;
-    return;
-}
-
-// 释放整个作用域(Scope)及其所有符号
-void freeScope(Scope *scope, TypeEnv *env) {
-    if (!scope || !env) return;
-    LIST_FREE(scope, Scope, scopeNode);
-    scope = NULL;
-    return;
 }
 
 // 打印类型名称
@@ -257,23 +179,25 @@ const char* typeToString(Type type) {
     }
 }
 
-// 打印当前作用域符号
+// 打印作用域符号
 void printCurrScopeSymbols(TypeEnv *env) {
-    if (!env || !env->currScope) {
+    if (!env || LIST_IS_EMPTY(&(env->scopeHead))) {
         printf("No active currScope\n");
         return;
     }
     
     printf("Scope symbols:\n");
-    Symbol *symbol = env->currScope->symbols;
-    Symbol *symbolHead = symbol;
-    if (symbolHead != NULL)
+
+    Symbol *currentSymbol = NULL;
+    Node *posSymbol, *prevSymbol;
+    Node *scopeHead = LIST_PEEK_TAIL(&(env->scopeHead));
+    Scope *currentScope = LIST_ENTRY(scopeHead, Scope, scopeNode);
+    LIST_FOREACH_SAFE(&(currentScope->symbols), posSymbol, prevSymbol)
     {
-        do {
-            printf("  %s : %s\n", symbol->symbolStr, typeToString(symbol->type));
-            symbol = LIST_ENTRY(symbol->symbolNode.next, Symbol, symbolNode);
-        } while(symbol != symbolHead);
+        currentSymbol = LIST_ENTRY(posSymbol, Symbol, symbolNode);
+        printf("  %s : %s\n", currentSymbol->symbolStr, typeToString(currentSymbol->type));
     }
+
     return;
 }
 
