@@ -148,11 +148,11 @@ bool addSymbolToScope(TypeEnv *env, const char *name, Type type) {
     if (head != NULL)
     {
         do{
-            if (strncmp(existing->symbolStr, name, strlen(name)+1) == 0 ||
+            if (strncmp(existing->symbolStr, name, strlen(name)+1) == 0 &&
                 existing->type == type) {
                 return true; // 符号已存在
             }
-            existing = (Symbol*)existing->symbolNode.next;
+            existing = LIST_ENTRY(existing->symbolNode.next, Symbol, symbolNode);
         }while(existing != head);
     }
 
@@ -179,26 +179,29 @@ Symbol* findSymbolInScope(TypeEnv *env, const char *name) {
     if (!env || !name) return NULL;
     
     Scope *currentScope = env->currScope;
-    Scope *currentScopeHead = currentScope;
+    Scope *currentScopeHead = env->currScope;
     Symbol *symbol = NULL;
     Symbol *symbolHead = NULL;
-    do{
-        symbol = currentScope->symbols;
-        symbolHead = currentScope->symbols;
+    if (currentScope != NULL)
+    {
         do{
-            if (strncmp(symbol->symbolStr, name, strlen(name) + 1) == 0) {
-                return symbol;
+            if (currentScope->symbols != NULL)
+            {
+                // 从最新的开始遍历
+                symbol = LIST_ENTRY((currentScope->symbols->symbolNode.prev), Symbol, symbolNode);
+                symbolHead = symbol;
+                
+                do{
+                    if (strncmp(symbol->symbolStr, name, strlen(name) + 1) == 0) {
+                        return symbol;
+                    }
+                    symbol = LIST_ENTRY(symbol->symbolNode.prev, Symbol, symbolNode);
+                } while(symbol != symbolHead);
             }
-            symbol = (Symbol*)symbol->symbolNode.next;
-        } while(symbol != symbolHead);
-        
-        // 移动到上一层作用域
-        if (currentScope->scopeNode.next != &currentScope->scopeNode) {
-            currentScope = (Scope*)(currentScope->scopeNode.prev);
-        } else {
-            currentScope = NULL;
-        }
-    } while(currentScope != currentScopeHead);
+            // 移动到上一层作用域
+            currentScope = LIST_ENTRY(currentScope->scopeNode.prev, Scope, scopeNode);
+        } while(currentScope != currentScopeHead);
+    }
 
     return NULL;
 }
@@ -252,13 +255,17 @@ void printCurrScopeSymbols(TypeEnv *env) {
     printf("Scope symbols:\n");
     Symbol *symbol = env->currScope->symbols;
     Symbol *symbolHead = symbol;
-    do {
-        printf("  %s : %s\n", symbol->symbolStr, typeToString(symbol->type));
-        symbol = (Symbol*)symbol->symbolNode.next;
-    } while(symbol != symbolHead);
+    if (symbolHead != NULL)
+    {
+        do {
+            printf("  %s : %s\n", symbol->symbolStr, typeToString(symbol->type));
+            symbol = LIST_ENTRY(symbol->symbolNode.next, Symbol, symbolNode);
+        } while(symbol != symbolHead);
+    }
+    return;
 }
 
-
+/**
 // 测试函数
 void testTypeEnv() {
     TypeEnv *env = initTypeEnv();
@@ -270,6 +277,11 @@ void testTypeEnv() {
     addSymbolToScope(env, "x", TYPE_INT32);
     addSymbolToScope(env, "y", TYPE_FLOAT32);
     addSymbolToScope(env, "name", TYPE_STRING);
+    addSymbolToScope(env, "x", TYPE_INT16);
+    addSymbolToScope(env, "x", TYPE_INT8);
+    addSymbolToScope(env, "name", TYPE_INT16);
+    addSymbolToScope(env, "temp", TYPE_INT8);
+    addSymbolToScope(env, "localVar", TYPE_FLOAT32);
     printCurrScopeSymbols(env);
     
     printf("\n=== Entering function currScope ===\n");
@@ -286,7 +298,10 @@ void testTypeEnv() {
     
     Symbol *local = findSymbolInScope(env, "localVar");
     printf("Found 'localVar': %s\n", local ? typeToString(local->type) : "Not found");
-    
+
+    Symbol *temp = findSymbolInScope(env, "temp");
+    printf("Found 'temp': %s\n", local ? typeToString(temp->type) : "Not found");
+
     Symbol *unknown = findSymbolInScope(env, "unknown");
     printf("Found 'unknown': %s\n", unknown ? typeToString(unknown->type) : "Not found");
     
@@ -304,4 +319,4 @@ int main() {
     testTypeEnv();
     return 0;
 }
-    
+     */
