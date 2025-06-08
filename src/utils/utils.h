@@ -84,6 +84,7 @@ do { \
         free(temp); /* 释放实际结构体内存 */ \
         temp = NULL; /* 防止野指针 */ \
     } \
+    INIT_LIST_HEAD(head); \
 } while (0)
 
 /**
