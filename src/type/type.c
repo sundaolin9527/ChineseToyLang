@@ -201,7 +201,7 @@ void printCurrScopeSymbols(TypeEnv *env) {
     return;
 }
 
-
+/*
 // 测试函数
 void testTypeEnv() {
     TypeEnv *env = initTypeEnv();
@@ -256,3 +256,4 @@ int main() {
     testTypeEnv();
     return 0;
 }
+    */

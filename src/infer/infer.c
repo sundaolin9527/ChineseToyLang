@@ -1,0 +1,273 @@
+#include "infer.h"
+#include <stdio.h>
+#include <stdbool.h>
+
+// 推断字面量类型
+Type infer_literal_type(ASTNode* node) {
+    switch (node->literal.literal_type) {
+        case LITERAL_NUMBER: return TYPE_INT32;
+        case LITERAL_STRING: return TYPE_STRING;
+        case LITERAL_CHAR: return TYPE_CHAR;
+        case LITERAL_BOOLEAN: return TYPE_BOOLEAN;
+        case LITERAL_NULL: return TYPE_PTR;
+        default: return TYPE_ANY;
+    }
+}
+
+// 推断二元表达式类型
+Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
+    Type left_type = infer_type(env, node->binary_expr.left);
+    Type right_type = infer_type(env, node->binary_expr.right);
+    
+    // 算术运算符
+    if (strcmp(node->binary_expr.operator, "+") == 0 ||
+        strcmp(node->binary_expr.operator, "-") == 0 ||
+        strcmp(node->binary_expr.operator, "*") == 0 ||
+        strcmp(node->binary_expr.operator, "/") == 0 ||
+        strcmp(node->binary_expr.operator, "%") == 0) 
+    {
+        switch (left_type)
+        {
+            case TYPE_INT8:
+                if(right_type == TYPE_CHAR){
+                    return TYPE_INT8;
+                }
+                else if (right_type == TYPE_INT8 || right_type == TYPE_INT16 ||
+                        right_type == TYPE_INT32 || right_type == TYPE_INT64 ||
+                        right_type == TYPE_FLOAT16 || right_type == TYPE_FLOAT32 ||
+                        right_type == TYPE_FLOAT64)
+                {
+                    return right_type;
+                }
+                else
+                {
+                    return TYPE_ERROR;
+                }
+            case TYPE_INT16:
+                if (right_type == TYPE_INT8 || right_type == TYPE_CHAR){
+                    return TYPE_INT16;
+                }
+                else if (right_type == TYPE_INT16 || right_type == TYPE_INT32 || 
+                        right_type == TYPE_INT64 || right_type == TYPE_FLOAT16 || 
+                        right_type == TYPE_FLOAT32 || right_type == TYPE_FLOAT64)
+                {
+                    return right_type;
+                }
+                else
+                {
+                    return TYPE_ERROR;
+                }
+            case TYPE_INT32:
+                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 || right_type == TYPE_CHAR){
+                    return TYPE_INT32;
+                }
+                else if (right_type == TYPE_INT32 ||  right_type == TYPE_INT64 || 
+                        right_type == TYPE_FLOAT16 || right_type == TYPE_FLOAT32 ||
+                        right_type == TYPE_FLOAT64)
+                {
+                    return right_type;
+                }
+                else
+                {
+                    return TYPE_ERROR;
+                }
+            case TYPE_INT64:
+                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 ||
+                    right_type == TYPE_INT32 || right_type == TYPE_INT64 ||
+                    right_type == TYPE_FLOAT16 || right_type == TYPE_FLOAT32 ||
+                    right_type == TYPE_FLOAT64 || right_type == TYPE_CHAR)
+                {
+                    return TYPE_INT64;
+                }
+                else
+                {
+                    return TYPE_ERROR;
+                }
+            case TYPE_FLOAT16:
+                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 || right_type == TYPE_FLOAT16 ||
+                    right_type == TYPE_CHAR)
+                {
+                    return TYPE_FLOAT16;
+                }
+                else if (right_type == TYPE_INT32 || right_type == TYPE_FLOAT32)
+                {
+                    return TYPE_FLOAT32;
+                }
+                else if (right_type == TYPE_INT64 || right_type == TYPE_FLOAT64)
+                {
+                    return TYPE_FLOAT64;
+                }
+                else
+                {
+                    return TYPE_ERROR;
+                }
+            case TYPE_FLOAT32:
+                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 || right_type == TYPE_FLOAT16 ||
+                    right_type == TYPE_INT32 || right_type == TYPE_FLOAT32 || right_type == TYPE_CHAR)
+                {
+                    return TYPE_FLOAT32;
+                }
+                else if (right_type == TYPE_INT64 || right_type == TYPE_FLOAT64)
+                {
+                    return TYPE_FLOAT64;
+                }
+                else
+                {
+                    return TYPE_ERROR;
+                }
+            case TYPE_FLOAT64:
+                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 || right_type == TYPE_FLOAT16 ||
+                    right_type == TYPE_INT32 || right_type == TYPE_FLOAT32 ||right_type == TYPE_INT64 || 
+                    right_type == TYPE_FLOAT64 || right_type == TYPE_CHAR)
+                {
+                    return TYPE_FLOAT64;
+                }
+                else
+                {
+                    return TYPE_ERROR;
+                }
+            //指针类型先不考虑
+            default:
+                break;
+        }
+    }
+    
+    // 比较运算符
+    if (strcmp(node->binary_expr.operator, "==") == 0 ||
+        strcmp(node->binary_expr.operator, "!=") == 0 ||
+        strcmp(node->binary_expr.operator, "<") == 0 ||
+        strcmp(node->binary_expr.operator, "<=") == 0 ||
+        strcmp(node->binary_expr.operator, ">") == 0 ||
+        strcmp(node->binary_expr.operator, ">=") == 0) 
+    {
+        return TYPE_BOOLEAN;
+    }
+    
+    // 逻辑运算符
+    if (strcmp(node->binary_expr.operator, "&&") == 0 ||
+        strcmp(node->binary_expr.operator, "||") == 0) {
+        
+        return TYPE_BOOLEAN;
+    }
+    
+    // 指数运算
+    if (strcmp(node->binary_expr.operator, "**") == 0) {
+        return TYPE_FLOAT64;
+    }
+    
+    return TYPE_ANY;
+}
+
+// 推断标识符类型
+Type infer_identifier_type(TypeEnv *env, ASTNode* node) {
+    if (!node) return TYPE_VOID;
+
+    Symbol* symbol = findSymbolInScope(env, node->identifier.name);
+    if (symbol != NULL) {
+        return symbol->type;
+    }
+    return TYPE_ANY;
+}
+
+// 推断函数调用类型
+Type infer_call_expr_type(TypeEnv *env, ASTNode* node) {
+    if (!node) return TYPE_VOID;
+
+    Symbol* symbol = findSymbolInScope(env, node->call.callee->identifier.name);
+    if (symbol != NULL && symbol->type == TYPE_FUNCTION) {
+        //return symbol->type->function.return_type;
+    }
+    return TYPE_ANY;
+}
+
+// 推断数组访问类型
+Type infer_array_access_type(TypeEnv *env, ASTNode* node) {
+    return infer_type(env, node->array_access.object);
+}
+
+// 主类型推断函数
+Type infer_type(TypeEnv *env, ASTNode* node) {
+    if (!node) return TYPE_VOID;
+    
+    if (node->inferred_type != NULL) {
+        return node->inferred_type;
+    }
+    
+    Type type = TYPE_UNKNOWN;
+    switch (node->type) {
+        case AST_UNARY_EXPR:
+           break;
+        case  AST_ASSIGNMENT_EXPR:
+            break;
+        case AST_OBJECT_ACCESS_EXPR:
+            break;
+        case AST_LITERAL_EXPR:
+            type = infer_literal_type(node);
+            break;
+        case AST_IDENTIFIER_EXPR:
+            type = infer_identifier_type(env, node);
+            break;
+        case AST_BINARY_EXPR:
+            type = infer_binary_expr_type(env, node);
+            break;
+        case AST_CALL_EXPR:
+            type = infer_call_expr_type(env, node);
+            break;
+        case AST_ARRAY_ACCESS_EXPR:
+            type = infer_array_access_type(env, node);
+            break;
+        case AST_VAR_DECL:
+            if (node->var_decl.value != NULL) {
+                type = infer_type(env, node->var_decl.value);
+            } else {
+                type = TYPE_ANY;
+            }
+            break;
+        /*
+        case AST_FUNC_DECL: {
+            // 创建函数类型
+            Type** param_types = (Type**)malloc(node->func_decl.param_count * sizeof(Type*));
+            for (int i = 0; i < node->func_decl.param_count; i++) {
+                param_types[i] = infer_type(node->func_decl.params[i]);
+            }
+            // 推断返回类型
+            Type* return_type = TYPE_VOID;
+            // 检查函数体中的return语句
+            if (node->func_decl.body != NULL && node->func_decl.body->type == AST_BLOCK_STMT) {
+                ASTNode* stmt = NULL;
+                StatementList *current = (node->func_decl.body)->block->statements;
+    
+                while (current != NULL) {
+                    // 处理当前节点的 statement
+                    ASTNode *stmt = current->statement;
+                    process_statement(stmt); // 你的处理函数
+                    
+                    // 移动到下一个节点
+                    current = current->next;
+                }
+                for (int i = 0; i < node->func_decl.body->block.statement_count; i++) {
+                    stmt = node->func_decl.body->block.statements[i];
+                    if (stmt->type == AST_RETURN_STMT && stmt->return_stmt.value->expr_stmt.expression != NULL) {
+                        return_type = infer_type(env, stmt->return_stmt.value->expr_stmt.expression);
+                        break;
+                    }
+                }
+            }
+            type = new_function_type(return_type, param_types, node->func_decl.param_count);
+            break;
+        }
+        case AST_STRUCT_DECL:
+            type = new_aggregate_type(node->struct_decl.name, false);
+            break;
+        case AST_UNION_DECL:
+            type = new_aggregate_type(node->struct_decl.name, true);
+            break;
+            */
+        default:
+            type = TYPE_ANY;
+            break;
+    }
+    
+    node->inferred_type = type;
+    return type;
+}

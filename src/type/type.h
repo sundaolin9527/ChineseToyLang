@@ -21,7 +21,9 @@ typedef enum Type{
     TYPE_ARRAY,     // 数组类型
     TYPE_STRUCT,    // 结构体
     TYPE_UNION,     // 联合体
-    TYPE_ANY        // 任意类型
+    TYPE_PTR,       // 指针类型
+    TYPE_ANY,        // 任意类型
+    TYPE_ERROR      //错误类型
 } Type;
 
 // 符号

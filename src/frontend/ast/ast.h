@@ -88,7 +88,7 @@ struct ASTNode {
     ASTNodeType type;
     int line;
     int column;
-    
+    Type inferred_type;
     union {
         /* 程序节点 */
         struct {
