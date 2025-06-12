@@ -22,7 +22,7 @@ ASTNode* new_ast_node(ASTNodeType type, int line) {
     node->type = type;
     node->line = line;
     node->inferred_type = TYPE_UNKNOWN;
-    
+
     /* 初始化联合体 */
     memset(&node->program, 0, sizeof(node->program));
     

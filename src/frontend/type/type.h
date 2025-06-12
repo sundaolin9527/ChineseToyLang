@@ -2,7 +2,7 @@
 #define TYPE_H
 
 #include <stdbool.h>
-#include "../utils/utils.h"
+#include "../datastructure/LinkedList.h"
 
 typedef enum Type{
     TYPE_UNKNOWN = 0,   // 未知类型
