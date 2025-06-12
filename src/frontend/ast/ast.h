@@ -2,6 +2,7 @@
 #define AST_H
 
 #include "../lexer/lexer.h"
+#include "../../type/type.h"
 
 /* 抽象语法树节点类型 */
 typedef enum {

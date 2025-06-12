@@ -17,6 +17,22 @@ target_include_directories(frontend PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/frontend
 )
 
+add_library(type STATIC
+    type/type.c
+)
+
+target_include_directories(type PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/type
+)
+
+add_library(infer STATIC
+    infer/infer.c
+)
+
+target_include_directories(infer PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/infer
+)
+
 # 工具
 add_library(utils STATIC
     utils/utils.c
@@ -30,7 +46,7 @@ target_include_directories(utils PUBLIC
 add_executable(ChineseToyLang
     main.c
 )
-target_link_libraries(ChineseToyLang PRIVATE frontend utils)
+target_link_libraries(ChineseToyLang PRIVATE frontend utils type infer)
 
 # 可选：生成编译器版本信息
 configure_file(
