@@ -86,9 +86,8 @@ struct MemberList {
 
 /* AST节点 */
 struct ASTNode {
-    ASTNodeType type;
     int line;
-    int column;
+    ASTNodeType type;
     Type inferred_type;
     union {
         /* 程序节点 */
@@ -224,7 +223,7 @@ struct ASTNode {
     };
 };
 
-ASTNode* new_ast_node(ASTNodeType type, int line, int column);
+ASTNode* new_ast_node(ASTNodeType type, int line);
 Parameter* new_parameter(const char *name, const char *type, ASTNode *default_value);
 StatementList* new_statement_list(ASTNode *statement);
 ExpressionList* new_expression_list(ASTNode *expression);

@@ -13,7 +13,7 @@
 void print_ast(ASTNode *node, int depth);
 
 /* 创建新的AST节点 */
-ASTNode* new_ast_node(ASTNodeType type, int line, int column) {
+ASTNode* new_ast_node(ASTNodeType type, int line) {
     ASTNode *node = (ASTNode*)malloc(sizeof(ASTNode));
     if (!node) {
         AST_ERROR_EXIT("内存分配失败\n");
@@ -21,7 +21,7 @@ ASTNode* new_ast_node(ASTNodeType type, int line, int column) {
     
     node->type = type;
     node->line = line;
-    node->column = column;
+    node->inferred_type = TYPE_UNKNOWN;
     
     /* 初始化联合体 */
     memset(&node->program, 0, sizeof(node->program));

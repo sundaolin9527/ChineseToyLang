@@ -79,7 +79,6 @@ typedef struct {
     TokenType type;
     char *value;
     int line;
-    int column;
 } Token;
 
 /* 定义词法分析器结构 */
@@ -87,7 +86,6 @@ typedef struct {
     const char *input;
     int position;
     int line;
-    int column;
 } Lexer;
 
 /* 函数声明 */

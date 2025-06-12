@@ -208,7 +208,6 @@ Lexer* init_lexer(const char *input) {
     lexer->input = input;
     lexer->position = 0;
     lexer->line = 1;
-    lexer->column = 1;
     return lexer;
 }
 
@@ -226,9 +225,6 @@ char advance(Lexer *lexer) {
     
     if (current == '\n') {
         lexer->line++;
-        lexer->column = 1;
-    } else {
-        lexer->column++;
     }
     
     lexer->position++;
@@ -264,7 +260,7 @@ void skip_whitespace(Lexer *lexer) {
 }
 
 /* 创建新的词法单元 */
-Token* new_token(TokenType type, const char *value, int line, int column) {
+Token* new_token(TokenType type, const char *value, int line) {
     if (!value) return NULL;
     
     Token *token = (Token*)malloc(sizeof(Token));
@@ -280,7 +276,6 @@ Token* new_token(TokenType type, const char *value, int line, int column) {
     }
     
     token->line = line;
-    token->column = column;
     return token;
 }
 
@@ -290,7 +285,6 @@ Token* parse_identifier(Lexer *lexer) {
     
     int start = lexer->position;
     int line = lexer->line;
-    int column = lexer->column;
     
     mbstate_t state = {0};
     size_t length = 0;
@@ -316,7 +310,7 @@ Token* parse_identifier(Lexer *lexer) {
     
     // 处理空标识符的情况
     if (length == 0) {
-        return new_token(TOKEN_MAX, "非法标识符", line, column);
+        return new_token(TOKEN_MAX, "非法标识符", line);
     }
     
     // 分配内存并复制标识符
@@ -330,14 +324,13 @@ Token* parse_identifier(Lexer *lexer) {
     
     // 更新词法分析器位置
     lexer->position += length;
-    lexer->column += length;
     
     Token *token = NULL;
     TokenType tokenType = get_identifier_token(value);
     if (tokenType == TOKEN_MAX) {
-        return new_token(TOKEN_MAX, "非法标识符", line, column);
+        return new_token(TOKEN_MAX, "非法标识符", line);
     }
-    token = new_token(tokenType, value, line, column);
+    token = new_token(tokenType, value, line);
     free(value);
     return token;
 }
@@ -348,7 +341,6 @@ Token* parse_number(Lexer *lexer) {
     
     int start = lexer->position;
     int line = lexer->line;
-    int column = lexer->column;
     int has_dot = 0;
     
     while (is_digit(peek(lexer)) || peek(lexer) == '.') {
@@ -362,14 +354,13 @@ Token* parse_number(Lexer *lexer) {
     // 检查是否以点结尾（非法数字）
     if (lexer->input[lexer->position - 1] == '.') {
         lexer->position--; // 回退一个字符
-        lexer->column--;
     }
     
     int length = lexer->position - start;
     
     // 处理空数字的情况
     if (length == 0) {
-        return new_token(TOKEN_MAX, "非法数字", line, column);
+        return new_token(TOKEN_MAX, "非法数字", line);
     }
     
     char *value = (char*)malloc(length + 1);
@@ -380,7 +371,7 @@ Token* parse_number(Lexer *lexer) {
     memcpy(value, lexer->input + start, length);
     value[length] = '\0';
     
-    Token *token = new_token(TOKEN_NUMBER, value, line, column);
+    Token *token = new_token(TOKEN_NUMBER, value, line);
     free(value);
     return token;
 }
@@ -391,7 +382,6 @@ Token* parse_string(Lexer *lexer) {
     
     int start = lexer->position + 1; // 跳过开始的引号
     int line = lexer->line;
-    int column = lexer->column + 1;
     
     advance(lexer); // 跳过开始的引号
     
@@ -411,7 +401,7 @@ Token* parse_string(Lexer *lexer) {
     }
     
     if (peek(lexer) == '\0') {
-        return new_token(TOKEN_MAX, "未闭合的字符串", line, column);
+        return new_token(TOKEN_MAX, "未闭合的字符串", line);
     }
     
     int length = lexer->position - start;
@@ -425,7 +415,7 @@ Token* parse_string(Lexer *lexer) {
     
     advance(lexer); // 跳过结束的引号
     
-    Token *token = new_token(TOKEN_STRING, value, line, column);
+    Token *token = new_token(TOKEN_STRING, value, line);
     free(value);
     return token;
 }
@@ -436,12 +426,11 @@ Token* parse_char(Lexer *lexer) {
     
     int start = lexer->position + 1; // 跳过开始的撇号
     int line = lexer->line;
-    int column = lexer->column + 1;
-    
+
     advance(lexer); // 跳过开始的撇号
     
     if (peek(lexer) == '\0') {
-        return new_token(TOKEN_MAX, "未闭合的字符", line, column);
+        return new_token(TOKEN_MAX, "未闭合的字符", line);
     }
     
     if (peek(lexer) == '\\') {
@@ -449,13 +438,13 @@ Token* parse_char(Lexer *lexer) {
     }
     
     if (peek(lexer) == '\'') {
-        return new_token(TOKEN_MAX, "空字符", line, column);
+        return new_token(TOKEN_MAX, "空字符", line);
     }
     
     advance(lexer); // 读取字符
     
     if (peek(lexer) != '\'') {
-        return new_token(TOKEN_MAX, "字符太长", line, column);
+        return new_token(TOKEN_MAX, "字符太长", line);
     }
     
     advance(lexer); // 跳过结束的撇号
@@ -464,7 +453,7 @@ Token* parse_char(Lexer *lexer) {
     
     // 处理空字符的情况
     if (length <= 0) {
-        return new_token(TOKEN_MAX, "非法字符", line, column);
+        return new_token(TOKEN_MAX, "非法字符", line);
     }
     
     char *value = (char*)malloc(length + 1);
@@ -475,7 +464,7 @@ Token* parse_char(Lexer *lexer) {
     memcpy(value, lexer->input + start, length);
     value[length] = '\0';
     
-    Token *token = new_token(TOKEN_CHAR, value, line, column);
+    Token *token = new_token(TOKEN_CHAR, value, line);
     free(value);
     return token;
 }
@@ -486,7 +475,6 @@ Token* parse_operator(Lexer *lexer) {
     
     int start = lexer->position;
     int line = lexer->line;
-    int column = lexer->column;
     TokenType tokenType = TOKEN_INIT;
     char *value = NULL;
 
@@ -504,9 +492,8 @@ Token* parse_operator(Lexer *lexer) {
         
         if ((tokenType = get_operator_token(value)) != TOKEN_MAX) {
             lexer->position += len;
-            lexer->column += len;
             
-            Token *token = new_token(tokenType, value, line, column);
+            Token *token = new_token(tokenType, value, line);
             free(value);
             return token;
         }
@@ -519,7 +506,7 @@ Token* parse_operator(Lexer *lexer) {
     sprintf(error, "未知运算符: %c", peek(lexer));
     advance(lexer);
     
-    return new_token(TOKEN_MAX, error, line, column);
+    return new_token(TOKEN_MAX, error, line);
 }
 
 /* 解析分隔符 */
@@ -528,7 +515,6 @@ Token* parse_separator(Lexer *lexer) {
     
     int start = lexer->position;
     int line = lexer->line;
-    int column = lexer->column;
     TokenType tokenType = TOKEN_INIT;
     char *value = NULL;
 
@@ -546,9 +532,8 @@ Token* parse_separator(Lexer *lexer) {
         
         if ((tokenType = get_separator_token(value)) != TOKEN_MAX) {
             lexer->position += len;
-            lexer->column += len;
             
-            Token *token = new_token(tokenType, value, line, column);
+            Token *token = new_token(tokenType, value, line);
             free(value);
             return token;
         }
@@ -561,7 +546,7 @@ Token* parse_separator(Lexer *lexer) {
     sprintf(error, "未知分隔符: %c", peek(lexer));
     advance(lexer);
     
-    return new_token(TOKEN_MAX, error, line, column);
+    return new_token(TOKEN_MAX, error, line);
 }
 
 /* 获取下一个词法单元 */
@@ -624,13 +609,13 @@ Token* get_next_token(Lexer *lexer) {
         // 如果都不匹配，返回错误
         char error[20];
         sprintf(error, "非法字符: %c", peek(lexer));
-        Token *token = new_token(TOKEN_MAX, error, lexer->line, lexer->column);
+        Token *token = new_token(TOKEN_MAX, error, lexer->line);
         advance(lexer);
         return token;
     }
     
     // 到达输入末尾
-    return new_token(TOKEN_EOF, "", lexer->line, lexer->column);
+    return new_token(TOKEN_EOF, "", lexer->line);
 }
 
 /* 释放词法单元的内存 */

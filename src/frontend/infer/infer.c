@@ -223,46 +223,17 @@ Type infer_type(TypeEnv *env, ASTNode* node) {
                 type = TYPE_ANY;
             }
             break;
-        /*
+
         case AST_FUNC_DECL: {
-            // 创建函数类型
-            Type** param_types = (Type**)malloc(node->func_decl.param_count * sizeof(Type*));
-            for (int i = 0; i < node->func_decl.param_count; i++) {
-                param_types[i] = infer_type(node->func_decl.params[i]);
-            }
-            // 推断返回类型
-            Type* return_type = TYPE_VOID;
-            // 检查函数体中的return语句
-            if (node->func_decl.body != NULL && node->func_decl.body->type == AST_BLOCK_STMT) {
-                ASTNode* stmt = NULL;
-                StatementList *current = (node->func_decl.body)->block->statements;
-    
-                while (current != NULL) {
-                    // 处理当前节点的 statement
-                    ASTNode *stmt = current->statement;
-                    process_statement(stmt); // 你的处理函数
-                    
-                    // 移动到下一个节点
-                    current = current->next;
-                }
-                for (int i = 0; i < node->func_decl.body->block.statement_count; i++) {
-                    stmt = node->func_decl.body->block.statements[i];
-                    if (stmt->type == AST_RETURN_STMT && stmt->return_stmt.value->expr_stmt.expression != NULL) {
-                        return_type = infer_type(env, stmt->return_stmt.value->expr_stmt.expression);
-                        break;
-                    }
-                }
-            }
-            type = new_function_type(return_type, param_types, node->func_decl.param_count);
+            /**todo */
             break;
         }
         case AST_STRUCT_DECL:
-            type = new_aggregate_type(node->struct_decl.name, false);
+            /**todo */
             break;
         case AST_UNION_DECL:
-            type = new_aggregate_type(node->struct_decl.name, true);
+            /**todo */
             break;
-            */
         default:
             type = TYPE_ANY;
             break;
