@@ -1,6 +1,7 @@
 #include "infer.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 // 推断字面量类型
 Type infer_literal_type(ASTNode* node) {
@@ -162,7 +163,7 @@ Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
 Type infer_identifier_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_VOID;
 
-    Symbol* symbol = findSymbolInScope(env, node->identifier.name);
+    Symbol* symbol = find_symbol_in_scope(env, node->identifier.name);
     if (symbol != NULL) {
         return symbol->type;
     }
@@ -173,7 +174,7 @@ Type infer_identifier_type(TypeEnv *env, ASTNode* node) {
 Type infer_call_expr_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_VOID;
 
-    Symbol* symbol = findSymbolInScope(env, node->call.callee->identifier.name);
+    Symbol* symbol = find_symbol_in_scope(env, node->call.callee->identifier.name);
     if (symbol != NULL && symbol->type == TYPE_FUNCTION) {
         //return symbol->type->function.return_type;
     }
@@ -189,7 +190,7 @@ Type infer_array_access_type(TypeEnv *env, ASTNode* node) {
 Type infer_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_VOID;
     
-    if (node->inferred_type != NULL) {
+    if (node->inferred_type != TYPE_UNKNOWN) {
         return node->inferred_type;
     }
     

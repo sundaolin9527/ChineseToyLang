@@ -260,7 +260,8 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_VAR_DECL:
-            printf("VAR_DECL: %s (%s)\n", 
+            printf("VAR_DECL (%s): %s (%s)\n", 
+                   type_to_string(node->inferred_type),
                    node->var_decl.name,
                    node->var_decl.var_type == VAR_TYPE_VARIABLE ? "令" : "恒");
             if (node->var_decl.value) {
@@ -269,7 +270,7 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_FUNC_DECL:
-            printf("FUNC_DECL: %s\n", node->func_decl.name);
+            printf("FUNC_DECL (%s): %s\n", type_to_string(node->inferred_type), node->func_decl.name);
             
             for (int i = 0; i < depth + 1; i++) {
                 printf("  ");
@@ -371,7 +372,8 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_LITERAL_EXPR:
-            printf("LITERAL_EXPR: %s (%s)\n", 
+            printf("LITERAL_EXPR (%s): %s (%s)\n", 
+                   type_to_string(node->inferred_type),
                    node->literal.value,
                    node->literal.literal_type == LITERAL_NUMBER ? "NUMBER" :
                    node->literal.literal_type == LITERAL_STRING ? "STRING" :
@@ -380,28 +382,28 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_IDENTIFIER_EXPR:
-            printf("IDENTIFIER_EXPR: %s\n", node->identifier.name);
+            printf("IDENTIFIER_EXPR (%s): %s\n", type_to_string(node->inferred_type), node->identifier.name);
             break;
             
         case AST_BINARY_EXPR:
-            printf("BINARY_EXPR: %s\n", node->binary_expr.operator);
+            printf("BINARY_EXPR (%s): %s\n", type_to_string(node->inferred_type),node->binary_expr.operator);
             print_ast(node->binary_expr.left, depth + 1);
             print_ast(node->binary_expr.right, depth + 1);
             break;
             
         case AST_UNARY_EXPR:
-            printf("UNARY_EXPR: %s\n", node->unary_expr.operator);
+            printf("UNARY_EXPR (%s): %s\n", type_to_string(node->inferred_type), node->unary_expr.operator);
             print_ast(node->unary_expr.operand, depth + 1);
             break;
             
         case AST_ASSIGNMENT_EXPR:
-            printf("ASSIGNMENT_EXPR: %s\n", node->assignment.operator);
+            printf("ASSIGNMENT_EXPR (%s): %s\n", type_to_string(node->inferred_type), node->assignment.operator);
             print_ast(node->assignment.left, depth + 1);
             print_ast(node->assignment.right, depth + 1);
             break;
             
         case AST_CALL_EXPR:
-            printf("CALL_EXPR\n");
+            printf("CALL_EXPR (%s)\n", type_to_string(node->inferred_type));
             print_ast(node->call.callee, depth + 1);
             
             for (int i = 0; i < depth + 1; i++) {
@@ -415,18 +417,18 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_ARRAY_ACCESS_EXPR:
-            printf("ARRAY_ACCESS_EXPR\n");
+            printf("ARRAY_ACCESS_EXPR (%s):\n", type_to_string(node->inferred_type));
             print_ast(node->array_access.object, depth + 1);
             print_ast(node->array_access.index, depth + 1);
             break;
             
         case AST_OBJECT_ACCESS_EXPR:
-            printf("OBJECT_ACCESS_EXPR: %s\n", node->object_access.property);
+            printf("OBJECT_ACCESS_EXPR (%s): %s\n", type_to_string(node->inferred_type), node->object_access.property);
             print_ast(node->object_access.object, depth + 1);
             break;
             
         case AST_ANONYMOUS_FUNC_EXPR:
-            printf("ANONYMOUS_FUNC_EXPR\n");
+            printf("ANONYMOUS_FUNC_EXPR (%s)\n", type_to_string(node->inferred_type));
             
             for (int i = 0; i < depth + 1; i++) {
                 printf("  ");
@@ -455,17 +457,17 @@ void print_ast(ASTNode *node, int depth) {
             printf("BREAK_STMT\n");
             break;
         case AST_STRUCT_DECL:
-            printf("STRUCT_DECL: %s\n", node->struct_or_union_decl.name);
+            printf("STRUCT_DECL (%s): %s\n", type_to_string(node->inferred_type), node->struct_or_union_decl.name);
             print_member_list(node->struct_or_union_decl.members, depth + 1);
             break;
             
         case AST_UNION_DECL:
-            printf("UNION_DECL: %s\n", node->struct_or_union_decl.name);
+            printf("UNION_DECL (%s): %s\n", type_to_string(node->inferred_type), node->struct_or_union_decl.name);
             print_member_list(node->struct_or_union_decl.members, depth + 1);
             break;
             
         case AST_MEMBER_DECL:
-            printf("MEMBER_DECL:");
+            printf("MEMBER_DECL (%s):", type_to_string(node->inferred_type));
             printf("%s\n", node->member_decl.name);
             break;
     }

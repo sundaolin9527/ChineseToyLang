@@ -51,10 +51,34 @@ Parser* init_parser(Lexer *lexer) {
     
     parser->lexer = lexer;
     parser->current_token = get_next_token(lexer);
-    
+    parser->env = init_type_env();
     return parser;
 }
 
+void free_parser(Parser **pparser) {
+    if (!pparser || !(*pparser)) return;
+
+    Parser *parser = *pparser;
+    if (parser->env)
+    {
+        free_type_env(&parser->env);
+    }
+
+    if (parser->current_token)
+    {
+        free(parser->current_token);
+        parser->current_token = NULL;
+    }
+
+    if (parser->lexer)
+    {
+        free(parser->lexer);
+        parser->lexer = NULL;
+    }
+    free(parser);
+    *pparser = NULL;
+    return;
+}
 /* 消耗当前token并获取下一个token */
 void eat(Parser *parser, TokenType token_type) {
     if (parser->current_token->type == token_type) {
@@ -121,7 +145,7 @@ ASTNode* parse_var_declaration(Parser *parser) {
         SYNTAX_ERROR_EXIT(parser, "分号", TOKEN_SEMICOLON);
     }
     eat(parser, TOKEN_SEMICOLON);
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -155,7 +179,7 @@ ASTNode* parse_func_declaration(Parser *parser) {
     eat(parser, TOKEN_RIGHT_PAREN);
     
     node->func_decl.body = parse_statement(parser);
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -421,7 +445,7 @@ ASTNode* parse_block_statement(Parser *parser) {
     ASTNode *statement = NULL;
 
     eat(parser, TOKEN_LEFT_BRACE);  // 消耗"{"
-    
+    enter_scope(parser->env);
     while (parser->current_token->type != TOKEN_RIGHT_BRACE) {
         if (parser->current_token->type == TOKEN_EOF) {
             SYNTAX_ERROR_EXIT(parser, "右花括号", TOKEN_RIGHT_BRACE);
@@ -439,7 +463,7 @@ ASTNode* parse_block_statement(Parser *parser) {
     }
     
     eat(parser, TOKEN_RIGHT_BRACE);  // 消耗"}"
-    
+    exit_scope(parser->env);
     return node;
 }
 
@@ -517,10 +541,10 @@ ASTNode* parse_assignment_expression(Parser *parser) {
         node->assignment.operator = operator;
         node->assignment.left = left;
         node->assignment.right = right;
-        
+        node->inferred_type = infer_type(parser->env, node);
         return node;
     }
-    
+    left->inferred_type = infer_type(parser->env, left);
     return left;
 }
 
@@ -546,7 +570,7 @@ ASTNode* parse_logical_or_expression(Parser *parser) {
         
         node = new_node;
     }
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -572,7 +596,7 @@ ASTNode* parse_logical_and_expression(Parser *parser) {
         
         node = new_node;
     }
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -600,7 +624,7 @@ ASTNode* parse_equality_expression(Parser *parser) {
         node = new_node;
         tokenType = parser->current_token->type;
     }
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -629,7 +653,7 @@ ASTNode* parse_comparison_expression(Parser *parser) {
         node = new_node;
         tokenType = parser->current_token->type;
     }
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -657,7 +681,7 @@ ASTNode* parse_additive_expression(Parser *parser) {
         node = new_node;
         tokenType = parser->current_token->type;
     }
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -685,7 +709,7 @@ ASTNode* parse_multiplicative_expression(Parser *parser) {
         node = new_node;
         tokenType = parser->current_token->type; 
     }
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -711,7 +735,7 @@ ASTNode* parse_exponential_expression(Parser *parser) {
         
         node = new_node;
     }
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -731,7 +755,7 @@ ASTNode* parse_unary_expression(Parser *parser) {
         ASTNode *node = new_ast_node(AST_UNARY_EXPR, line);
         node->unary_expr.operator = operator;
         node->unary_expr.operand = operand;
-        
+        node->inferred_type = infer_type(parser->env, node);
         return node;
     }
     
@@ -845,7 +869,7 @@ ASTNode* parse_primary_expression(Parser *parser) {
             break;
         }
     }
-    
+    node->inferred_type = infer_type(parser->env, node);
     return node;
 }
 
@@ -947,7 +971,7 @@ ASTNode* parse_member_declaration(Parser* parser) {
     node->line = parser->current_token->line;
     node->member_decl.name = name;
     node->member_decl.type = NULL; // 简单格式
-    
+    node->inferred_type = TYPE_ANY;
     return node;
 }
 

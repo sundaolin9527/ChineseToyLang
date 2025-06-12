@@ -50,11 +50,12 @@ struct TypeEnv {
     Node idle_symbol; // 空闲符号链表，存放Symbol
 };
 
-TypeEnv *initTypeEnv();
-void freeTypeEnv(TypeEnv **typeEnv) ;
-void enterScope(TypeEnv *env);
-void exitScope(TypeEnv *env);
-bool addSymbolToScope(TypeEnv *env, const char *name, Type type);
-Symbol* findSymbolInScope(TypeEnv *env, const char *name);
-void printCurrScopeSymbols(TypeEnv *env);
+TypeEnv *init_type_env();
+void free_type_env(TypeEnv **typeEnv) ;
+void enter_scope(TypeEnv *env);
+void exit_scope(TypeEnv *env);
+bool add_symbol_to_scope(TypeEnv *env, const char *name, Type type);
+Symbol* find_symbol_in_scope(TypeEnv *env, const char *name);
+void print_currscope_symbols(TypeEnv *env);
+const char* type_to_string(Type type);
 #endif // TYPE_H

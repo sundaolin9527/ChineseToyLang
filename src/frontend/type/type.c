@@ -5,7 +5,7 @@
 #include "type.h"
 
 // 清理类型环境
-void cleanupTypeEnv(TypeEnv *env) {
+void cleanup_type_env(TypeEnv *env) {
     if (!env) return;
 
     LIST_FREE(&(env->scopeHead), Scope, scopeNode);
@@ -15,7 +15,7 @@ void cleanupTypeEnv(TypeEnv *env) {
 }
 
 // 从空闲链表获取或创建新作用域
-static Scope* getOrCreateScope(TypeEnv *env) {
+static Scope* get_or_create_scope(TypeEnv *env) {
     if (!env) return NULL;
 
     Node *node = LIST_POP_HEAD(&(env->idle_scope));
@@ -31,7 +31,7 @@ static Scope* getOrCreateScope(TypeEnv *env) {
 }
 
 // 从空闲链表获取或创建新符号
-static Symbol* getOrCreateSymbol(TypeEnv *env) {
+static Symbol* get_or_create_symbol(TypeEnv *env) {
     if (!env) return NULL;
 
     Node *node = LIST_POP_HEAD(&(env->idle_symbol));
@@ -47,7 +47,7 @@ static Symbol* getOrCreateSymbol(TypeEnv *env) {
 }
 
 // 初始化类型环境
-TypeEnv *initTypeEnv() {
+TypeEnv *init_type_env() {
     TypeEnv *typeEnv = (TypeEnv*)malloc(sizeof(TypeEnv));
     if (typeEnv) {
         memset(typeEnv, 0, sizeof(TypeEnv));
@@ -58,23 +58,23 @@ TypeEnv *initTypeEnv() {
     return typeEnv;
 }
 
-void freeTypeEnv(TypeEnv **typeEnv) {
+void free_type_env(TypeEnv **typeEnv) {
     if (!typeEnv|| !(*typeEnv))
     {
         return;
     }
 
-    cleanupTypeEnv(*typeEnv);
+    cleanup_type_env(*typeEnv);
     free(*typeEnv);
     *typeEnv = NULL;
     return;
 }
 
 // 进入新作用域
-void enterScope(TypeEnv *env) {
+void enter_scope(TypeEnv *env) {
     if (!env) return;
     
-    Scope *newScope = getOrCreateScope(env);
+    Scope *newScope = get_or_create_scope(env);
     if (!newScope) return;
 
     // 将新作用域压入栈顶
@@ -83,7 +83,7 @@ void enterScope(TypeEnv *env) {
 }
 
 // 离开当前作用域
-void exitScope(TypeEnv *env) {
+void exit_scope(TypeEnv *env) {
     if (!env || LIST_IS_EMPTY(&(env->scopeHead))) return;
     
     // 离开当前作用域
@@ -100,7 +100,7 @@ void exitScope(TypeEnv *env) {
 }
 
 // 在当前作用域添加符号
-bool addSymbolToScope(TypeEnv *env, const char *name, Type type) {
+bool add_symbol_to_scope(TypeEnv *env, const char *name, Type type) {
     if (!env || LIST_IS_EMPTY(&(env->scopeHead)) || !name) return false;
     
     // 检查符号是否已存在
@@ -120,7 +120,7 @@ bool addSymbolToScope(TypeEnv *env, const char *name, Type type) {
     }
 
     // 创建新符号
-    Symbol *symbol = getOrCreateSymbol(env);
+    Symbol *symbol = get_or_create_symbol(env);
     if (!symbol) return false;
     strncpy(symbol->symbolStr, name, strlen(name)+1);
     symbol->type = type;
@@ -132,7 +132,7 @@ bool addSymbolToScope(TypeEnv *env, const char *name, Type type) {
 }
 
 // 查找符号（从当前作用域向外查找）
-Symbol* findSymbolInScope(TypeEnv *env, const char *name) {
+Symbol* find_symbol_in_scope(TypeEnv *env, const char *name) {
     if (!env || LIST_IS_EMPTY(&(env->scopeHead)) || !name) return NULL;
     
     Scope *currentScope = NULL;
@@ -156,7 +156,7 @@ Symbol* findSymbolInScope(TypeEnv *env, const char *name) {
 }
 
 // 打印类型名称
-const char* typeToString(Type type) {
+const char* type_to_string(Type type) {
     switch (type) {
         case TYPE_UNKNOWN: return "UNKNOWN";
         case TYPE_INT8: return "INT8";
@@ -180,7 +180,7 @@ const char* typeToString(Type type) {
 }
 
 // 打印作用域符号
-void printCurrScopeSymbols(TypeEnv *env) {
+void print_currscope_symbols(TypeEnv *env) {
     if (!env || LIST_IS_EMPTY(&(env->scopeHead))) {
         printf("No active currScope\n");
         return;
@@ -195,7 +195,7 @@ void printCurrScopeSymbols(TypeEnv *env) {
     LIST_FOREACH_SAFE(&(currentScope->symbols), posSymbol, prevSymbol)
     {
         currentSymbol = LIST_ENTRY(posSymbol, Symbol, symbolNode);
-        printf("  %s : %s\n", currentSymbol->symbolStr, typeToString(currentSymbol->type));
+        printf("  %s : %s\n", currentSymbol->symbolStr, type_to_string(currentSymbol->type));
     }
 
     return;
@@ -204,52 +204,52 @@ void printCurrScopeSymbols(TypeEnv *env) {
 /*
 // 测试函数
 void testTypeEnv() {
-    TypeEnv *env = initTypeEnv();
+    TypeEnv *env = init_type_env();
     
     printf("=== Entering global currScope ===\n");
-    enterScope(env);
+    enter_scope(env);
     
     printf("Adding symbols to global currScope...\n");
-    addSymbolToScope(env, "x", TYPE_INT32);
-    addSymbolToScope(env, "y", TYPE_FLOAT32);
-    addSymbolToScope(env, "name", TYPE_STRING);
-    addSymbolToScope(env, "x", TYPE_INT16);
-    addSymbolToScope(env, "x", TYPE_INT8);
-    addSymbolToScope(env, "name", TYPE_INT16);
-    addSymbolToScope(env, "temp", TYPE_INT8);
-    addSymbolToScope(env, "localVar", TYPE_FLOAT32);
-    printCurrScopeSymbols(env);
+    add_symbol_to_scope(env, "x", TYPE_INT32);
+    add_symbol_to_scope(env, "y", TYPE_FLOAT32);
+    add_symbol_to_scope(env, "name", TYPE_STRING);
+    add_symbol_to_scope(env, "x", TYPE_INT16);
+    add_symbol_to_scope(env, "x", TYPE_INT8);
+    add_symbol_to_scope(env, "name", TYPE_INT16);
+    add_symbol_to_scope(env, "temp", TYPE_INT8);
+    add_symbol_to_scope(env, "localVar", TYPE_FLOAT32);
+    print_currscope_symbols(env);
     
     printf("\n=== Entering function currScope ===\n");
-    enterScope(env);
+    enter_scope(env);
     
     printf("Adding symbols to function currScope...\n");
-    addSymbolToScope(env, "localVar", TYPE_BOOLEAN);
-    addSymbolToScope(env, "temp", TYPE_INT16);
-    printCurrScopeSymbols(env);
+    add_symbol_to_scope(env, "localVar", TYPE_BOOLEAN);
+    add_symbol_to_scope(env, "temp", TYPE_INT16);
+    print_currscope_symbols(env);
     
     printf("\nLooking up symbols:\n");
-    Symbol *x = findSymbolInScope(env, "x");
-    printf("Found 'x': %s\n", x ? typeToString(x->type) : "Not found");
+    Symbol *x = find_symbol_in_scope(env, "x");
+    printf("Found 'x': %s\n", x ? type_to_string(x->type) : "Not found");
     
-    Symbol *local = findSymbolInScope(env, "localVar");
-    printf("Found 'localVar': %s\n", local ? typeToString(local->type) : "Not found");
+    Symbol *local = find_symbol_in_scope(env, "localVar");
+    printf("Found 'localVar': %s\n", local ? type_to_string(local->type) : "Not found");
 
-    Symbol *temp = findSymbolInScope(env, "temp");
-    printf("Found 'temp': %s\n", local ? typeToString(temp->type) : "Not found");
+    Symbol *temp = find_symbol_in_scope(env, "temp");
+    printf("Found 'temp': %s\n", local ? type_to_string(temp->type) : "Not found");
 
-    Symbol *unknown = findSymbolInScope(env, "unknown");
-    printf("Found 'unknown': %s\n", unknown ? typeToString(unknown->type) : "Not found");
+    Symbol *unknown = find_symbol_in_scope(env, "unknown");
+    printf("Found 'unknown': %s\n", unknown ? type_to_string(unknown->type) : "Not found");
     
     printf("\n=== Exiting function currScope ===\n");
-    exitScope(env);
-    printCurrScopeSymbols(env);
+    exit_scope(env);
+    print_currscope_symbols(env);
     
     printf("\n=== Exiting global currScope ===\n");
-    exitScope(env);
-    printCurrScopeSymbols(env);
+    exit_scope(env);
+    print_currscope_symbols(env);
     
-    freeTypeEnv(&env);
+    free_type_env(&env);
 }
 
 int main() {
