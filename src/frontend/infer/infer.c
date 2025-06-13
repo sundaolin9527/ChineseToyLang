@@ -6,11 +6,21 @@
 // 推断字面量类型
 Type infer_literal_type(ASTNode* node) {
     switch (node->literal.literal_type) {
-        case LITERAL_NUMBER: return TYPE_INT32;
-        case LITERAL_STRING: return TYPE_STRING;
-        case LITERAL_CHAR: return TYPE_CHAR;
+        case LITERAL_INT8:    return TYPE_INT8;
+        case LITERAL_INT16:   return TYPE_INT16;
+        case LITERAL_INT32:   return TYPE_INT32;
+        case LITERAL_INT64:   return TYPE_INT64;
+        case LITERAL_UINT8:   return TYPE_UINT8;
+        case LITERAL_UINT16:  return TYPE_UINT16;
+        case LITERAL_UINT32:  return TYPE_UINT32;
+        case LITERAL_UINT64:  return TYPE_UINT64;
+        case LITERAL_FLOAT16: return TYPE_FLOAT16;
+        case LITERAL_FLOAT32: return TYPE_FLOAT32;
+        case LITERAL_FLOAT64: return TYPE_FLOAT64;
+        case LITERAL_STRING:  return TYPE_STRING;
+        case LITERAL_CHAR:    return TYPE_CHAR;
         case LITERAL_BOOLEAN: return TYPE_BOOLEAN;
-        case LITERAL_NULL: return TYPE_PTR;
+        case LITERAL_NULL:    return TYPE_PTR;
         default: return TYPE_ANY;
     }
 }
@@ -224,16 +234,10 @@ Type infer_type(TypeEnv *env, ASTNode* node) {
                 type = TYPE_ANY;
             }
             break;
-
-        case AST_FUNC_DECL: {
-            /**todo */
-            break;
-        }
+        case AST_FUNC_DECL:
         case AST_STRUCT_DECL:
-            /**todo */
-            break;
         case AST_UNION_DECL:
-            /**todo */
+            type = TYPE_ANY;
             break;
         default:
             type = TYPE_ANY;

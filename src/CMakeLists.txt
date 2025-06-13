@@ -28,6 +28,8 @@ target_include_directories(utils PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils
 )
 
+target_link_libraries(utils PRIVATE m)  # 仅 utils 链接数学库
+
 # 驱动程序和主入口
 add_executable(ChineseToyLang
     main.c

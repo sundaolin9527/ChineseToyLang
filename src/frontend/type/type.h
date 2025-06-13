@@ -6,10 +6,14 @@
 
 typedef enum Type{
     TYPE_UNKNOWN = 0,   // 未知类型
-    TYPE_INT8,      // 1字节整型
-    TYPE_INT16,     // 2字节整型
-    TYPE_INT32,     // 4字节整型
-    TYPE_INT64,     // 8字节整型
+    TYPE_INT8,      // 1字节有符号整型
+    TYPE_INT16,     // 2字节有符号整型
+    TYPE_INT32,     // 4字节有符号整型
+    TYPE_INT64,     // 8字节有符号整型
+    TYPE_UINT8,      // 1字节无符号整型
+    TYPE_UINT16,     // 2字节无符号整型
+    TYPE_UINT32,     // 4字节无符号整型
+    TYPE_UINT64,     // 8字节无符号整型
     TYPE_FLOAT16,   // 2字节浮点型
     TYPE_FLOAT32,   // 4字节浮点型
     TYPE_FLOAT64,   // 8字节浮点型

@@ -5,6 +5,7 @@
 #include "../ast/ast.h"
 #include "../type/type.h"
 #include "../infer/infer.h"
+#include "../../utils/utils.h"
 
 /* 解析器结构 */
 typedef struct {
