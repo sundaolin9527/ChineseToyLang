@@ -12,6 +12,31 @@
 
 void print_ast(ASTNode *node, int depth);
 
+Operator token_to_operator(TokenType token) {
+    if (token == TOKEN_PLUS) return OP_PLUS;
+    if (token == TOKEN_MINUS) return OP_MINUS;
+    if (token == TOKEN_STAR) return OP_STAR;
+    if (token == TOKEN_SLASH) return OP_SLASH;
+    if (token == TOKEN_PERCENT) return OP_PERCENT;
+    if (token == TOKEN_POW) return OP_POW;
+    if (token == TOKEN_EQ) return OP_EQ;
+    if (token == TOKEN_NE) return OP_NE;
+    if (token == TOKEN_GT) return OP_GT;
+    if (token == TOKEN_LT) return OP_LT;
+    if (token == TOKEN_GE) return OP_GE;
+    if (token == TOKEN_LE) return OP_LE;
+    if (token == TOKEN_AND) return OP_AND;
+    if (token == TOKEN_OR) return OP_OR;
+    if (token == TOKEN_NOT) return OP_NOT;
+    if (token == TOKEN_ASSIGN) return OP_ASSIGN;
+    if (token == TOKEN_ADD_ASSIGN) return OP_ADD_ASSIGN;
+    if (token == TOKEN_SUB_ASSIGN) return OP_SUB_ASSIGN;
+    if (token == TOKEN_MUL_ASSIGN) return OP_MUL_ASSIGN;
+    if (token == TOKEN_DIV_ASSIGN) return OP_DIV_ASSIGN;
+    if (token == TOKEN_MOD_ASSIGN) return OP_MOD_ASSIGN;
+    return OP_UNKNOWN;
+}
+
 /* 创建新的AST节点 */
 ASTNode* new_ast_node(ASTNodeType type, int line) {
     ASTNode *node = (ASTNode*)malloc(sizeof(ASTNode));
@@ -183,18 +208,15 @@ void free_ast_node(ASTNode *node) {
             break;
             
         case AST_BINARY_EXPR:
-            free(node->binary_expr.operator);
             free_ast_node(node->binary_expr.left);
             free_ast_node(node->binary_expr.right);
             break;
             
         case AST_UNARY_EXPR:
-            free(node->unary_expr.operator);
             free_ast_node(node->unary_expr.operand);
             break;
             
         case AST_ASSIGNMENT_EXPR:
-            free(node->assignment.operator);
             free_ast_node(node->assignment.left);
             free_ast_node(node->assignment.right);
             break;
@@ -233,6 +255,42 @@ void free_ast_node(ASTNode *node) {
     }
     
     free(node);
+}
+
+const char* operator_to_string(Operator op) {
+    if (op == OP_UNKNOWN) return "OP_UNKNOWN";
+    
+    // 算术运算符
+    if (op == OP_PLUS) return "+";
+    if (op == OP_MINUS) return "-";
+    if (op == OP_STAR) return "*";
+    if (op == OP_SLASH) return "/";
+    if (op == OP_PERCENT) return "%";
+    if (op == OP_POW) return "**";
+    
+    // 比较运算符
+    if (op == OP_EQ) return "==";
+    if (op == OP_NE) return "!=";
+    if (op == OP_GT) return ">";
+    if (op == OP_LT) return "<";
+    if (op == OP_GE) return ">=";
+    if (op == OP_LE) return "<=";
+    
+    // 逻辑运算符
+    if (op == OP_AND) return "&&";
+    if (op == OP_OR) return "||";
+    if (op == OP_NOT) return "!";
+    
+    // 赋值运算符
+    if (op == OP_ASSIGN) return "=";
+    if (op == OP_ADD_ASSIGN) return "+=";
+    if (op == OP_SUB_ASSIGN) return "-=";
+    if (op == OP_MUL_ASSIGN) return "*=";
+    if (op == OP_DIV_ASSIGN) return "/=";
+    if (op == OP_MOD_ASSIGN) return "%=";
+    
+    // 无效操作符
+    return "OP_INVALID";
 }
 
 /* 打印AST（用于调试） */
@@ -396,18 +454,21 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_BINARY_EXPR:
-            printf("BINARY_EXPR: %s :: %s\n", node->binary_expr.operator, type_to_string(node->inferred_type));
+            printf("BINARY_EXPR: %s :: %s\n", operator_to_string(node->binary_expr.operator), 
+                                type_to_string(node->inferred_type));
             print_ast(node->binary_expr.left, depth + 1);
             print_ast(node->binary_expr.right, depth + 1);
             break;
             
         case AST_UNARY_EXPR:
-            printf("UNARY_EXPR: %s :: %s\n", node->unary_expr.operator, type_to_string(node->inferred_type));
+            printf("UNARY_EXPR: %s :: %s\n", operator_to_string(node->unary_expr.operator), 
+                          type_to_string(node->inferred_type));
             print_ast(node->unary_expr.operand, depth + 1);
             break;
             
         case AST_ASSIGNMENT_EXPR:
-            printf("ASSIGNMENT_EXPR: %s :: %s\n", node->assignment.operator, type_to_string(node->inferred_type));
+            printf("ASSIGNMENT_EXPR: %s :: %s\n", operator_to_string(node->assignment.operator), 
+                     type_to_string(node->inferred_type));
             print_ast(node->assignment.left, depth + 1);
             print_ast(node->assignment.right, depth + 1);
             break;
@@ -477,8 +538,7 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_MEMBER_DECL:
-            printf("MEMBER_DECL :: %s", type_to_string(node->inferred_type));
-            printf("%s\n", node->member_decl.name);
+            printf("MEMBER_DECL: %s :: %s\n", node->member_decl.name, type_to_string(node->inferred_type));
             break;
     }
 }

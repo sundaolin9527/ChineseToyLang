@@ -65,6 +65,39 @@ typedef enum {
     LITERAL_NULL
 } LiteralType;
 
+// 操作符
+typedef enum {
+    OP_UNKNOWN = 0,
+    // 算术运算符
+    OP_PLUS,        // +
+    OP_MINUS,       // -
+    OP_STAR,        // *
+    OP_SLASH,       // /
+    OP_PERCENT,     // %
+    OP_POW,         // **
+    
+    // 比较运算符
+    OP_EQ,          // ==
+    OP_NE,          // !=
+    OP_GT,          // >
+    OP_LT,          // <
+    OP_GE,          // >=
+    OP_LE,          // <=
+    
+    // 逻辑运算符
+    OP_AND,         // &&
+    OP_OR,          // ||
+    OP_NOT,         // !
+    
+    // 赋值运算符
+    OP_ASSIGN,      // =
+    OP_ADD_ASSIGN,  // +=
+    OP_SUB_ASSIGN,  // -=
+    OP_MUL_ASSIGN,  // *=
+    OP_DIV_ASSIGN,  // /=
+    OP_MOD_ASSIGN   // %=
+} Operator;
+
 /* AST节点结构 */
 typedef struct ASTNode ASTNode;
 typedef struct Parameter Parameter;
@@ -182,20 +215,20 @@ struct ASTNode {
         
         /* 二元表达式节点 */
         struct {
-            char *operator;
+            Operator operator;
             ASTNode *left;
             ASTNode *right;
         } binary_expr;
         
         /* 一元表达式节点 */
         struct {
-            char *operator;
+            Operator operator;
             ASTNode *operand;
         } unary_expr;
         
         /* 赋值表达式节点 */
         struct {
-            char *operator;
+            Operator operator;
             ASTNode *left;
             ASTNode *right;
         } assignment;
@@ -237,6 +270,7 @@ struct ASTNode {
     };
 };
 
+Operator token_to_operator(TokenType token);
 ASTNode* new_ast_node(ASTNodeType type, int line);
 Parameter* new_parameter(const char *name, const char *type, ASTNode *default_value);
 StatementList* new_statement_list(ASTNode *statement);

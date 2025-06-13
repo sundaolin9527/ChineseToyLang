@@ -531,14 +531,12 @@ ASTNode* parse_assignment_expression(Parser *parser) {
         tokenType == TOKEN_MUL_ASSIGN ||
         tokenType == TOKEN_DIV_ASSIGN ||
         tokenType == TOKEN_MOD_ASSIGN) {
-        
-        char *operator = strdup(parser->current_token->value);
         eat(parser, tokenType);
         
         ASTNode *right = parse_assignment_expression(parser);
         
         ASTNode *node = new_ast_node(AST_ASSIGNMENT_EXPR, line);
-        node->assignment.operator = operator;
+        node->assignment.operator = token_to_operator(tokenType);
         node->assignment.left = left;
         node->assignment.right = right;
         node->inferred_type = infer_type(parser->env, node);
@@ -557,14 +555,11 @@ ASTNode* parse_logical_or_expression(Parser *parser) {
     ASTNode *node = parse_logical_and_expression(parser);
     
     while (parser->current_token->type == TOKEN_OR) {
-        
-        char *operator = strdup(parser->current_token->value);
         eat(parser, TOKEN_OR);
-        
+
         right = parse_logical_and_expression(parser);
-        
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = operator;
+        new_node->binary_expr.operator = token_to_operator(TOKEN_OR);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -583,14 +578,12 @@ ASTNode* parse_logical_and_expression(Parser *parser) {
     ASTNode *node = parse_equality_expression(parser);
     
     while (parser->current_token->type == TOKEN_AND) {
-        
-        char *operator = strdup(parser->current_token->value);
         eat(parser, TOKEN_AND);
         
         right = parse_equality_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = operator;
+        new_node->binary_expr.operator = token_to_operator(TOKEN_AND);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -610,14 +603,12 @@ ASTNode* parse_equality_expression(Parser *parser) {
 
     TokenType tokenType = parser->current_token->type;
     while (tokenType == TOKEN_EQ || tokenType == TOKEN_NE) {
-        
-        char *operator = strdup(parser->current_token->value);
         eat(parser, tokenType);
         
         right = parse_comparison_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = operator;
+        new_node->binary_expr.operator = token_to_operator(tokenType);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -640,13 +631,12 @@ ASTNode* parse_comparison_expression(Parser *parser) {
     while (tokenType == TOKEN_GT || tokenType == TOKEN_LT ||
            tokenType == TOKEN_GE || tokenType == TOKEN_LE ) {
         
-        char *operator = strdup(parser->current_token->value);
         eat(parser, tokenType);
         
         right = parse_additive_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = operator;
+        new_node->binary_expr.operator = token_to_operator(tokenType);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -667,14 +657,12 @@ ASTNode* parse_additive_expression(Parser *parser) {
 
     TokenType tokenType = parser->current_token->type;
     while (tokenType == TOKEN_PLUS || tokenType == TOKEN_MINUS) {
-        
-        char *operator = strdup(parser->current_token->value);
         eat(parser, tokenType);
         
         right = parse_multiplicative_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = operator;
+        new_node->binary_expr.operator = token_to_operator(tokenType);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -690,19 +678,16 @@ ASTNode* parse_multiplicative_expression(Parser *parser) {
     ASTNode *right = NULL;
     ASTNode *new_node = NULL;
     int line = parser->current_token->line;
-    char *operator = NULL;
     ASTNode *node = parse_exponential_expression(parser);
 
     TokenType tokenType = parser->current_token->type;
     while (tokenType == TOKEN_STAR || tokenType == TOKEN_SLASH ||
            tokenType == TOKEN_PERCENT) {
-           
-        operator = strdup(parser->current_token->value);
         eat(parser, tokenType);
         
         right = parse_exponential_expression(parser);
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = operator;
+        new_node->binary_expr.operator = token_to_operator(tokenType);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -722,14 +707,12 @@ ASTNode* parse_exponential_expression(Parser *parser) {
     ASTNode *node = parse_unary_expression(parser);
     
     while (parser->current_token->type == TOKEN_POW) {
-        
-        char *operator = strdup(parser->current_token->value);
         eat(parser, TOKEN_POW);
         
         right = parse_unary_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = operator;
+        new_node->binary_expr.operator = token_to_operator(TOKEN_POW);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -746,14 +729,12 @@ ASTNode* parse_unary_expression(Parser *parser) {
 
     if (tokenType == TOKEN_PLUS || tokenType == TOKEN_MINUS ||
         tokenType == TOKEN_NOT) {
-        
-        char *operator = strdup(parser->current_token->value);
         eat(parser, tokenType);
         
         ASTNode *operand = parse_unary_expression(parser);
         
         ASTNode *node = new_ast_node(AST_UNARY_EXPR, line);
-        node->unary_expr.operator = operator;
+        node->unary_expr.operator = token_to_operator(tokenType);
         node->unary_expr.operand = operand;
         node->inferred_type = infer_type(parser->env, node);
         return node;

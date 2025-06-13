@@ -29,13 +29,11 @@ Type infer_literal_type(ASTNode* node) {
 Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
     Type left_type = infer_type(env, node->binary_expr.left);
     Type right_type = infer_type(env, node->binary_expr.right);
-    
+    Operator op = node->binary_expr.operator;
+
     // 算术运算符
-    if (strcmp(node->binary_expr.operator, "+") == 0 ||
-        strcmp(node->binary_expr.operator, "-") == 0 ||
-        strcmp(node->binary_expr.operator, "*") == 0 ||
-        strcmp(node->binary_expr.operator, "/") == 0 ||
-        strcmp(node->binary_expr.operator, "%") == 0) 
+    if (op == OP_PLUS || op == OP_MINUS || op == OP_STAR || 
+        op == OP_SLASH || op == OP_PERCENT)
     {
         switch (left_type)
         {
@@ -143,26 +141,21 @@ Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
         }
     }
     
-    // 比较运算符
-    if (strcmp(node->binary_expr.operator, "==") == 0 ||
-        strcmp(node->binary_expr.operator, "!=") == 0 ||
-        strcmp(node->binary_expr.operator, "<") == 0 ||
-        strcmp(node->binary_expr.operator, "<=") == 0 ||
-        strcmp(node->binary_expr.operator, ">") == 0 ||
-        strcmp(node->binary_expr.operator, ">=") == 0) 
+    if (op == OP_EQ || op == OP_NE || op == OP_LT || 
+        op == OP_LE || op == OP_GT || op == OP_GE) 
     {
         return TYPE_BOOLEAN;
     }
     
     // 逻辑运算符
-    if (strcmp(node->binary_expr.operator, "&&") == 0 ||
-        strcmp(node->binary_expr.operator, "||") == 0) {
+    if (op == OP_AND || op == OP_OR) {
         
         return TYPE_BOOLEAN;
     }
     
     // 指数运算
-    if (strcmp(node->binary_expr.operator, "**") == 0) {
+    if (op == OP_POW)
+    {
         return TYPE_FLOAT64;
     }
     
