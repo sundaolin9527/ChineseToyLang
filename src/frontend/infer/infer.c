@@ -60,7 +60,7 @@ Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
 
         if (left_type == TYPE_CHAR) left_type = TYPE_UINT8;
         if (right_type == TYPE_CHAR) right_type = TYPE_UINT8;
-
+        
         return type_promotion_table[left_type][right_type];
     }
 
@@ -168,6 +168,15 @@ Type infer_assignment_expr_type(TypeEnv *env, ASTNode* node) {
     return type;
 }
 
+Type infer_var_decl_type(TypeEnv *env, ASTNode* node) {
+    if (!node) return TYPE_ANY;
+
+    if (node->var_decl.value) {
+        return infer_type(env, node->var_decl.value);
+    }
+    return TYPE_ANY;
+}
+
 // 主类型推断函数
 Type infer_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_ANY;
@@ -176,47 +185,19 @@ Type infer_type(TypeEnv *env, ASTNode* node) {
         return node->inferred_type;
     }
     
-    Type type = TYPE_UNKNOWN;
     switch (node->type) {
-        case AST_UNARY_EXPR:
-           type = infer_unary_expr_type(env, node);
-           break;
-        case AST_ASSIGNMENT_EXPR:
-            type = infer_assignment_expr_type(env, node);
-            break;
-        case AST_OBJECT_ACCESS_EXPR:
-            break;
-        case AST_LITERAL_EXPR:
-            type = infer_literal_type(node);
-            break;
-        case AST_IDENTIFIER_EXPR:
-            type = infer_identifier_type(env, node);
-            break;
-        case AST_BINARY_EXPR:
-            type = infer_binary_expr_type(env, node);
-            break;
-        case AST_CALL_EXPR:
-            type = infer_call_expr_type(env, node);
-            break;
-        case AST_ARRAY_ACCESS_EXPR:
-            type = infer_array_access_type(env, node);
-            break;
-        case AST_VAR_DECL:
-            if (node->var_decl.value != NULL) {
-                type = infer_type(env, node->var_decl.value);
-            } else {
-                type = TYPE_ANY;
-            }
-            break;
-        case AST_FUNC_DECL:
-        case AST_STRUCT_DECL:
-        case AST_UNION_DECL:
-            type = TYPE_ANY;
-            break;
-        default:
-            type = TYPE_ANY;
-            break;
+        case AST_UNARY_EXPR: return infer_unary_expr_type(env, node);
+        case AST_ASSIGNMENT_EXPR: return infer_assignment_expr_type(env, node);
+        case AST_OBJECT_ACCESS_EXPR:  break;
+        case AST_LITERAL_EXPR: return infer_literal_type(node);
+        case AST_IDENTIFIER_EXPR: return infer_identifier_type(env, node);
+        case AST_BINARY_EXPR: return infer_binary_expr_type(env, node);
+        case AST_CALL_EXPR: return infer_call_expr_type(env, node);
+        case AST_ARRAY_ACCESS_EXPR: return infer_array_access_type(env, node);
+        case AST_VAR_DECL: return infer_var_decl_type(env, node);
+        case AST_FUNC_DECL: return TYPE_ANY;
+        case AST_STRUCT_DECL: return TYPE_ANY;
+        case AST_UNION_DECL: return TYPE_ANY;
+        default: return TYPE_ANY;
     }
-    
-    return type;
 }
