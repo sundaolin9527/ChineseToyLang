@@ -3,6 +3,70 @@
 #include <stdbool.h>
 #include <string.h>
 
+#define TYPE_COUNT (12)
+// 类型提升规则说明：
+// 1. 整数提升规则：
+//    - 有符号与无符号运算时，向更大范围的有符号类型提升
+//    - 例如：INT8 + UINT16 -> INT16
+// 2. 浮点提升规则：
+//    - 任何浮点与整数运算都向浮点类型提升
+//    - 浮点类型之间向更高精度提升
+// 3. 特殊处理：
+//    - 所有与UNKNOWN类型的运算结果都是UNKNOWN
+// 类型提升规则表（[left][right] -> result）
+static const Type type_promotion_table[TYPE_COUNT][TYPE_COUNT] = {
+    /* 左\右       UNK           I8             I16          I32           I64           U8            U16           U32           U64           F16           F32           F64 */
+    /* UNKNOWN */ {TYPE_UNKNOWN, TYPE_UNKNOWN,TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN},
+    /* INT8    */ {TYPE_UNKNOWN, TYPE_INT8,   TYPE_INT16,   TYPE_INT32,   TYPE_INT64,   TYPE_INT16,   TYPE_INT16,   TYPE_INT32,   TYPE_INT64,   TYPE_FLOAT16, TYPE_FLOAT32, TYPE_FLOAT64},
+    /* INT16   */ {TYPE_UNKNOWN, TYPE_INT16,  TYPE_INT16,   TYPE_INT32,   TYPE_INT64,   TYPE_INT16,   TYPE_INT16,   TYPE_INT32,   TYPE_INT64,   TYPE_FLOAT16, TYPE_FLOAT32, TYPE_FLOAT64},
+    /* INT32   */ {TYPE_UNKNOWN, TYPE_INT32,  TYPE_INT32,   TYPE_INT32,   TYPE_INT64,   TYPE_INT32,   TYPE_INT32,   TYPE_INT32,   TYPE_INT64,   TYPE_FLOAT32, TYPE_FLOAT32, TYPE_FLOAT64},
+    /* INT64   */ {TYPE_UNKNOWN, TYPE_INT64,  TYPE_INT64,   TYPE_INT64,   TYPE_INT64,   TYPE_INT64,   TYPE_INT64,   TYPE_INT64,   TYPE_INT64,   TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64},
+    /* UINT8   */ {TYPE_UNKNOWN, TYPE_INT16,  TYPE_INT16,   TYPE_INT32,   TYPE_INT64,   TYPE_UINT8,   TYPE_UINT16,  TYPE_UINT32,  TYPE_UINT64,  TYPE_FLOAT16, TYPE_FLOAT32, TYPE_FLOAT64},
+    /* UINT16  */ {TYPE_UNKNOWN, TYPE_INT16,  TYPE_INT16,   TYPE_INT32,   TYPE_INT64,   TYPE_UINT16,  TYPE_UINT16,  TYPE_UINT32,  TYPE_UINT64,  TYPE_FLOAT16, TYPE_FLOAT32, TYPE_FLOAT64},
+    /* UINT32  */ {TYPE_UNKNOWN, TYPE_INT32,  TYPE_INT32,   TYPE_INT32,   TYPE_INT64,   TYPE_UINT32,  TYPE_UINT32,  TYPE_UINT32,  TYPE_UINT64,  TYPE_FLOAT32, TYPE_FLOAT32, TYPE_FLOAT64},
+    /* UINT64  */ {TYPE_UNKNOWN, TYPE_INT64,  TYPE_INT64,   TYPE_INT64,   TYPE_INT64,   TYPE_UINT64,  TYPE_UINT64,  TYPE_UINT64,  TYPE_UINT64,  TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64},
+    /* FLOAT16 */ {TYPE_UNKNOWN, TYPE_FLOAT16,TYPE_FLOAT16, TYPE_FLOAT32, TYPE_FLOAT64, TYPE_FLOAT16, TYPE_FLOAT16, TYPE_FLOAT32, TYPE_FLOAT64, TYPE_FLOAT16, TYPE_FLOAT32, TYPE_FLOAT64},
+    /* FLOAT32 */ {TYPE_UNKNOWN, TYPE_FLOAT32,TYPE_FLOAT32, TYPE_FLOAT32, TYPE_FLOAT64, TYPE_FLOAT32, TYPE_FLOAT32, TYPE_FLOAT32, TYPE_FLOAT64, TYPE_FLOAT32, TYPE_FLOAT32, TYPE_FLOAT64},
+    /* FLOAT64 */ {TYPE_UNKNOWN, TYPE_FLOAT64,TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64, TYPE_FLOAT64}
+};
+
+// 推断二元表达式类型
+Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
+    // 获取左右操作数类型
+    Type left_type = infer_type(env, node->binary_expr.left);
+    Type right_type = infer_type(env, node->binary_expr.right);
+    Operator op = node->binary_expr.operator;
+    
+    // 任一操作数为TYPE_ANY则直接返回
+    if (left_type == TYPE_ANY || right_type == TYPE_ANY) {
+        return TYPE_ANY;
+    }
+
+    // 处理比较和逻辑运算符
+    if (op == OP_EQ || op == OP_NE || op == OP_LT || 
+        op == OP_LE || op == OP_GT || op == OP_GE || 
+        op == OP_AND || op == OP_OR) {
+        return TYPE_BOOLEAN;
+    }
+
+    // 处理算术运算符
+    if (op == OP_PLUS || op == OP_MINUS || op == OP_STAR || 
+        op == OP_SLASH || op == OP_PERCENT || op == OP_POW) 
+    {
+        if (left_type > TYPE_COUNT || right_type > TYPE_COUNT)
+        {
+            return TYPE_UNKNOWN;
+        }
+
+        if (left_type == TYPE_CHAR) left_type = TYPE_UINT8;
+        if (right_type == TYPE_CHAR) right_type = TYPE_UINT8;
+
+        return type_promotion_table[left_type][right_type];
+    }
+
+    return TYPE_ANY;
+}
+
 // 推断字面量类型
 Type infer_literal_type(ASTNode* node) {
     switch (node->literal.literal_type) {
@@ -23,143 +87,6 @@ Type infer_literal_type(ASTNode* node) {
         case LITERAL_NULL:    return TYPE_PTR;
         default: return TYPE_ANY;
     }
-}
-
-// 推断二元表达式类型
-Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
-    Type left_type = infer_type(env, node->binary_expr.left);
-    Type right_type = infer_type(env, node->binary_expr.right);
-    Operator op = node->binary_expr.operator;
-
-    // 算术运算符
-    if (op == OP_PLUS || op == OP_MINUS || op == OP_STAR || 
-        op == OP_SLASH || op == OP_PERCENT)
-    {
-        switch (left_type)
-        {
-            case TYPE_INT8:
-                if(right_type == TYPE_CHAR){
-                    return TYPE_INT8;
-                }
-                else if (right_type == TYPE_INT8 || right_type == TYPE_INT16 ||
-                        right_type == TYPE_INT32 || right_type == TYPE_INT64 ||
-                        right_type == TYPE_FLOAT16 || right_type == TYPE_FLOAT32 ||
-                        right_type == TYPE_FLOAT64)
-                {
-                    return right_type;
-                }
-                else
-                {
-                    return TYPE_ERROR;
-                }
-            case TYPE_INT16:
-                if (right_type == TYPE_INT8 || right_type == TYPE_CHAR){
-                    return TYPE_INT16;
-                }
-                else if (right_type == TYPE_INT16 || right_type == TYPE_INT32 || 
-                        right_type == TYPE_INT64 || right_type == TYPE_FLOAT16 || 
-                        right_type == TYPE_FLOAT32 || right_type == TYPE_FLOAT64)
-                {
-                    return right_type;
-                }
-                else
-                {
-                    return TYPE_ERROR;
-                }
-            case TYPE_INT32:
-                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 || right_type == TYPE_CHAR){
-                    return TYPE_INT32;
-                }
-                else if (right_type == TYPE_INT32 ||  right_type == TYPE_INT64 || 
-                        right_type == TYPE_FLOAT16 || right_type == TYPE_FLOAT32 ||
-                        right_type == TYPE_FLOAT64)
-                {
-                    return right_type;
-                }
-                else
-                {
-                    return TYPE_ERROR;
-                }
-            case TYPE_INT64:
-                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 ||
-                    right_type == TYPE_INT32 || right_type == TYPE_INT64 ||
-                    right_type == TYPE_FLOAT16 || right_type == TYPE_FLOAT32 ||
-                    right_type == TYPE_FLOAT64 || right_type == TYPE_CHAR)
-                {
-                    return TYPE_INT64;
-                }
-                else
-                {
-                    return TYPE_ERROR;
-                }
-            case TYPE_FLOAT16:
-                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 || right_type == TYPE_FLOAT16 ||
-                    right_type == TYPE_CHAR)
-                {
-                    return TYPE_FLOAT16;
-                }
-                else if (right_type == TYPE_INT32 || right_type == TYPE_FLOAT32)
-                {
-                    return TYPE_FLOAT32;
-                }
-                else if (right_type == TYPE_INT64 || right_type == TYPE_FLOAT64)
-                {
-                    return TYPE_FLOAT64;
-                }
-                else
-                {
-                    return TYPE_ERROR;
-                }
-            case TYPE_FLOAT32:
-                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 || right_type == TYPE_FLOAT16 ||
-                    right_type == TYPE_INT32 || right_type == TYPE_FLOAT32 || right_type == TYPE_CHAR)
-                {
-                    return TYPE_FLOAT32;
-                }
-                else if (right_type == TYPE_INT64 || right_type == TYPE_FLOAT64)
-                {
-                    return TYPE_FLOAT64;
-                }
-                else
-                {
-                    return TYPE_ERROR;
-                }
-            case TYPE_FLOAT64:
-                if (right_type == TYPE_INT8 || right_type == TYPE_INT16 || right_type == TYPE_FLOAT16 ||
-                    right_type == TYPE_INT32 || right_type == TYPE_FLOAT32 ||right_type == TYPE_INT64 || 
-                    right_type == TYPE_FLOAT64 || right_type == TYPE_CHAR)
-                {
-                    return TYPE_FLOAT64;
-                }
-                else
-                {
-                    return TYPE_ERROR;
-                }
-            //指针类型先不考虑
-            default:
-                break;
-        }
-    }
-    
-    if (op == OP_EQ || op == OP_NE || op == OP_LT || 
-        op == OP_LE || op == OP_GT || op == OP_GE) 
-    {
-        return TYPE_BOOLEAN;
-    }
-    
-    // 逻辑运算符
-    if (op == OP_AND || op == OP_OR) {
-        
-        return TYPE_BOOLEAN;
-    }
-    
-    // 指数运算
-    if (op == OP_POW)
-    {
-        return TYPE_FLOAT64;
-    }
-    
-    return TYPE_ANY;
 }
 
 // 推断标识符类型
@@ -219,7 +146,7 @@ Type infer_unary_expr_type(TypeEnv *env, ASTNode* node) {
             break;
         case OP_STAR:
             temp_type = infer_type(env, node->unary_expr.operand);
-            if (temp_type != TYPE_PTR) return TYPE_ERROR;
+            if (temp_type != TYPE_PTR) return TYPE_UNKNOWN;
             type = temp_type;
             break;
         default:

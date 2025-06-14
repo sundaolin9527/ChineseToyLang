@@ -259,7 +259,6 @@ struct ASTNode {
 
         struct {
             char *name;     // 成员名
-            char *type;     // 类型（可为NULL）
         } member_decl;
 
         /* 结构体或结构体声明节点 */

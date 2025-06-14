@@ -92,6 +92,7 @@ void eat(Parser *parser, TokenType token_type) {
 
 /* 解析程序 */
 ASTNode* parse_program(Parser *parser) {
+    enter_scope(parser->env);
     ASTNode *node = new_ast_node(AST_PROGRAM, 0);
     node->program.statements = NULL;
     StatementList *tail = NULL;
@@ -107,7 +108,7 @@ ASTNode* parse_program(Parser *parser) {
             tail = tail->next;
         }
     }
-    
+    exit_scope(parser->env);
     return node;
 }
 
@@ -146,6 +147,7 @@ ASTNode* parse_var_declaration(Parser *parser) {
     }
     eat(parser, TOKEN_SEMICOLON);
     node->inferred_type = infer_type(parser->env, node);
+    add_symbol_to_scope(parser->env, node->var_decl.name, node->inferred_type);
     return node;
 }
 
@@ -199,17 +201,6 @@ Parameter* parse_parameter_list(Parser *parser) {
         eat(parser, TOKEN_IDENTIFIER);
         
         char *type = NULL;
-        if (parser->current_token->type == TOKEN_COLON) {
-            eat(parser, TOKEN_COLON);
-            
-            if (parser->current_token->type != TOKEN_IDENTIFIER) {
-                SYNTAX_ERROR_EXIT(parser, "类型注解", TOKEN_IDENTIFIER);
-            }
-            
-            type = strdup(parser->current_token->value);
-            eat(parser, TOKEN_IDENTIFIER);
-        }
-        
         if (parser->current_token->type == TOKEN_ASSIGN) {
             eat(parser, TOKEN_ASSIGN);
             default_value = parse_expression(parser);
@@ -981,7 +972,6 @@ ASTNode* parse_member_declaration(Parser* parser) {
     node->type = AST_MEMBER_DECL;
     node->line = parser->current_token->line;
     node->member_decl.name = name;
-    node->member_decl.type = NULL; // 简单格式
     node->inferred_type = TYPE_ANY;
     return node;
 }
@@ -1072,11 +1062,10 @@ ASTNode* parse_struct_or_union(Parser* parser) {
         SYNTAX_ERROR_EXIT(parser, "分号", TOKEN_SEMICOLON);
     }
     eat(parser, TOKEN_SEMICOLON);
-
+    
     // 创建AST节点
-    ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
-    node->type = decl_type;
-    node->line = parser->current_token->line;
+    ASTNode* node = new_ast_node(decl_type, parser->current_token->line);
+    node->inferred_type = TYPE_ANY;
     node->struct_or_union_decl.name = name;
     node->struct_or_union_decl.members = members;
     

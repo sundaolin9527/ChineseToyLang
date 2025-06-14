@@ -100,7 +100,7 @@ void exit_scope(TypeEnv *env) {
 }
 
 // 在当前作用域添加符号
-bool add_symbol_to_scope(TypeEnv *env, const char *name, Type type) {
+bool add_symbol_to_scope(TypeEnv *env, char *name, Type type) {
     if (!env || LIST_IS_EMPTY(&(env->scopeHead)) || !name) return false;
     
     // 检查符号是否已存在
@@ -132,7 +132,7 @@ bool add_symbol_to_scope(TypeEnv *env, const char *name, Type type) {
 }
 
 // 查找符号（从当前作用域向外查找）
-Symbol* find_symbol_in_scope(TypeEnv *env, const char *name) {
+Symbol* find_symbol_in_scope(TypeEnv *env, char *name) {
     if (!env || LIST_IS_EMPTY(&(env->scopeHead)) || !name) return NULL;
     
     Scope *currentScope = NULL;

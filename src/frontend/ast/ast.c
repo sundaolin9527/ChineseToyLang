@@ -245,12 +245,8 @@ void free_ast_node(ASTNode *node) {
             free(node->struct_or_union_decl.name);
             free_member_list(node->struct_or_union_decl.members);
             break;
-            
         case AST_MEMBER_DECL:
             free(node->member_decl.name);
-            if (node->member_decl.type) {
-                free(node->member_decl.type);
-            }
             break;
     }
     

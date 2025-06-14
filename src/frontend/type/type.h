@@ -27,7 +27,6 @@ typedef enum Type{
     TYPE_UNION,     // 联合体
     TYPE_PTR,       // 指针类型
     TYPE_ANY,        // 任意类型
-    TYPE_ERROR      //错误类型
 } Type;
 
 // 符号
@@ -58,8 +57,8 @@ TypeEnv *init_type_env();
 void free_type_env(TypeEnv **typeEnv) ;
 void enter_scope(TypeEnv *env);
 void exit_scope(TypeEnv *env);
-bool add_symbol_to_scope(TypeEnv *env, const char *name, Type type);
-Symbol* find_symbol_in_scope(TypeEnv *env, const char *name);
+bool add_symbol_to_scope(TypeEnv *env, char *name, Type type);
+Symbol* find_symbol_in_scope(TypeEnv *env, char *name);
 void print_currscope_symbols(TypeEnv *env);
 const char* type_to_string(Type type);
 #endif // TYPE_H
