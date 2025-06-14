@@ -216,7 +216,7 @@ Parameter* parse_parameter_list(Parser *parser) {
             tail = param;
         }
         head->para_cnt++;
-        
+
         if (parser->current_token->type != TOKEN_COMMA) {
             break;
         }
@@ -826,7 +826,7 @@ ASTNode* parse_primary_expression(Parser *parser) {
             eat(parser, TOKEN_LEFT_PAREN);  // 消耗"("
             
             call_node = new_ast_node(AST_CALL_EXPR, line);
-            call_node->call.callee = node;
+            call_node->call.callee = node; // 要找到函数的定义(todo)
             call_node->call.arguments = NULL;
             
             if (parser->current_token->type != TOKEN_RIGHT_PAREN) {
