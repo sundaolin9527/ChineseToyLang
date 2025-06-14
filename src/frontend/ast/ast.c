@@ -55,15 +55,15 @@ ASTNode* new_ast_node(ASTNodeType type, int line) {
 }
 
 /* 创建新的参数节点 */
-Parameter* new_parameter(const char *name, const char *type, ASTNode *default_value) {
+Parameter* new_parameter(const char *name, ASTNode *default_value) {
     Parameter *param = (Parameter*)malloc(sizeof(Parameter));
     if (!param) {
         AST_ERROR_EXIT("内存分配失败\n");
     }
     
     param->name = strdup(name);
-    param->type = type ? strdup(type) : NULL;
     param->default_value = default_value;
+    param->para_cnt = 0;
     param->next = NULL;
     
     return param;
@@ -121,7 +121,6 @@ void free_parameter(Parameter *param) {
     if (param == NULL) return;
     
     free(param->name);
-    if (param->type) free(param->type);
     if (param->default_value) free_ast_node(param->default_value);
     free(param);
 }
@@ -335,7 +334,6 @@ void print_ast(ASTNode *node, int depth) {
             for (Parameter *param = node->func_decl.params; param; param = param->next) {
                 if (!first) printf(", ");
                 printf("%s", param->name);
-                if (param->type) printf(":%s", param->type);
                 if (param->default_value) {
                     printf("=");
                     print_ast(param->default_value, depth + 2);
@@ -492,7 +490,6 @@ void print_ast(ASTNode *node, int depth) {
             for (Parameter *param = node->anonymous_func.params; param; param = param->next) {
                 if (!first) printf(", ");
                 printf("%s", param->name);
-                if (param->type) printf(":%s", param->type);
                 if (param->default_value) {
                     printf("=");
                     print_ast(param->default_value, depth + 2);

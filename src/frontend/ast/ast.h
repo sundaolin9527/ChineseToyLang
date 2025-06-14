@@ -108,8 +108,8 @@ typedef struct MemberList MemberList;
 /* 参数结构 */
 struct Parameter {
     char *name;
-    char *type;  // 类型注解
     ASTNode *default_value;  // 默认值表达式
+    int para_cnt; // 参数个数, 只在头节点保存
     Parameter *next;
 };
 
@@ -271,7 +271,7 @@ struct ASTNode {
 
 Operator token_to_operator(TokenType token);
 ASTNode* new_ast_node(ASTNodeType type, int line);
-Parameter* new_parameter(const char *name, const char *type, ASTNode *default_value);
+Parameter* new_parameter(const char *name, ASTNode *default_value);
 StatementList* new_statement_list(ASTNode *statement);
 ExpressionList* new_expression_list(ASTNode *expression);
 MemberList* new_member_list(const char* name);

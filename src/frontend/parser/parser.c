@@ -206,7 +206,7 @@ Parameter* parse_parameter_list(Parser *parser) {
             default_value = parse_expression(parser);
         }
         
-        param = new_parameter(name, type, default_value);
+        param = new_parameter(name, default_value);
         
         if (!head) {
             head = param;
@@ -215,6 +215,7 @@ Parameter* parse_parameter_list(Parser *parser) {
             tail->next = param;
             tail = param;
         }
+        head->para_cnt++;
         
         if (parser->current_token->type != TOKEN_COMMA) {
             break;
