@@ -748,19 +748,26 @@ int get_numeric_type(char *str) {
 
     char *endptr = NULL;
     long double value = strtold(str, &endptr);
+    char *dot_ptr = strchr(str, '.');
     if (*endptr == '\0' && endptr != str)
     {
-        if (IS_UINT_TYPE(value, UINT8_MAX)) return LITERAL_UINT8;
-        if (IS_UINT_TYPE(value, UINT16_MAX)) return LITERAL_UINT16;
-        if (IS_UINT_TYPE(value, UINT32_MAX)) return LITERAL_UINT32;
-        if (IS_UINT_TYPE(value, UINT64_MAX)) return LITERAL_UINT64;
-        if (IS_INT_TYPE(value, INT8_MIN, INT8_MAX)) return LITERAL_INT8;
-        if (IS_INT_TYPE(value, INT16_MIN, INT16_MAX)) return LITERAL_INT16;
-        if (IS_INT_TYPE(value, INT32_MIN, INT32_MAX)) return LITERAL_INT32;
-        if (IS_INT_TYPE(value, INT64_MIN, INT64_MAX)) return LITERAL_INT64;
-        if (IS_FLOAT_TYPE(value, -65504.0, 65504.0)) return LITERAL_FLOAT16;
-        if (IS_FLOAT_TYPE(value, -FLT_MAX, FLT_MAX)) return LITERAL_FLOAT32;
-        if (IS_FLOAT_TYPE(value, -DBL_MAX, DBL_MAX)) return LITERAL_FLOAT64;
+        if (dot_ptr == NULL)
+        {
+            if (IS_UINT_TYPE(value, UINT8_MAX)) return LITERAL_UINT8;
+            if (IS_UINT_TYPE(value, UINT16_MAX)) return LITERAL_UINT16;
+            if (IS_UINT_TYPE(value, UINT32_MAX)) return LITERAL_UINT32;
+            if (IS_UINT_TYPE(value, UINT64_MAX)) return LITERAL_UINT64;
+            if (IS_INT_TYPE(value, INT8_MIN, INT8_MAX)) return LITERAL_INT8;
+            if (IS_INT_TYPE(value, INT16_MIN, INT16_MAX)) return LITERAL_INT16;
+            if (IS_INT_TYPE(value, INT32_MIN, INT32_MAX)) return LITERAL_INT32;
+            if (IS_INT_TYPE(value, INT64_MIN, INT64_MAX)) return LITERAL_INT64;
+        }
+        else
+        {
+            if (IS_FLOAT_TYPE(value, -65504.0, 65504.0)) return LITERAL_FLOAT16;
+            if (IS_FLOAT_TYPE(value, -FLT_MAX, FLT_MAX)) return LITERAL_FLOAT32;
+            if (IS_FLOAT_TYPE(value, -DBL_MAX, DBL_MAX)) return LITERAL_FLOAT64;
+        }
     }
 
     return LITERAL_UNKNOWN;  // 不属于任何数值类型

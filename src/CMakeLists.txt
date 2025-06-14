@@ -4,6 +4,7 @@ project(elang_core LANGUAGES C)
 set(ELANG_VERSION "1.0.0")
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_BUILD_TYPE Debug)
 
 # 前端模块（词法/语法/语义分析）
 add_library(frontend STATIC

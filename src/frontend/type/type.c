@@ -163,6 +163,10 @@ const char* type_to_string(Type type) {
         case TYPE_INT16: return "INT16";
         case TYPE_INT32: return "INT32";
         case TYPE_INT64: return "INT64";
+        case TYPE_UINT8: return "UINT8";
+        case TYPE_UINT16: return "UINT16";
+        case TYPE_UINT32: return "UINT32";
+        case TYPE_UINT64: return "UINT64";
         case TYPE_FLOAT16: return "FLOAT16";
         case TYPE_FLOAT32: return "FLOAT32";
         case TYPE_FLOAT64: return "FLOAT64";

@@ -164,7 +164,7 @@ Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
 
 // 推断标识符类型
 Type infer_identifier_type(TypeEnv *env, ASTNode* node) {
-    if (!node) return TYPE_VOID;
+    if (!node) return TYPE_ANY;
 
     Symbol* symbol = find_symbol_in_scope(env, node->identifier.name);
     if (symbol != NULL) {
@@ -175,7 +175,7 @@ Type infer_identifier_type(TypeEnv *env, ASTNode* node) {
 
 // 推断函数调用类型
 Type infer_call_expr_type(TypeEnv *env, ASTNode* node) {
-    if (!node) return TYPE_VOID;
+    if (!node) return TYPE_ANY;
 
     Symbol* symbol = find_symbol_in_scope(env, node->call.callee->identifier.name);
     if (symbol != NULL && symbol->type == TYPE_FUNCTION) {
@@ -189,9 +189,61 @@ Type infer_array_access_type(TypeEnv *env, ASTNode* node) {
     return infer_type(env, node->array_access.object);
 }
 
+// 获取对应的有符号类型
+Type get_signed_type(Type unsigned_type) {
+    switch(unsigned_type) {
+        case TYPE_UINT8:  return TYPE_INT8;
+        case TYPE_UINT16: return TYPE_INT16;
+        case TYPE_UINT32: return TYPE_INT32;
+        case TYPE_UINT64: return TYPE_INT64;
+        default: return unsigned_type;
+    }
+}
+
+Type infer_unary_expr_type(TypeEnv *env, ASTNode* node) {
+    if (!node) return TYPE_ANY;
+
+    Type type = TYPE_ANY;
+    Type temp_type = TYPE_UNKNOWN;
+    Operator op = node->unary_expr.operator;
+
+    switch (op)
+    {
+        case OP_NOT:
+            type = TYPE_BOOLEAN;
+            break;
+        case OP_PLUS:
+        case OP_MINUS:
+            temp_type = infer_type(env, node->unary_expr.operand);
+            type = get_signed_type(temp_type);
+            break;
+        case OP_STAR:
+            temp_type = infer_type(env, node->unary_expr.operand);
+            if (temp_type != TYPE_PTR) return TYPE_ERROR;
+            type = temp_type;
+            break;
+        default:
+            break;
+    }
+
+    return type;
+}
+
+Type infer_assignment_expr_type(TypeEnv *env, ASTNode* node) {
+    if (!node) return TYPE_ANY;
+
+    Type type = infer_type(env, node->assignment.right);
+    //修正标识符的类型
+    if (node->assignment.left){
+        node->assignment.left->inferred_type = type;
+    }
+    
+    return type;
+}
+
 // 主类型推断函数
 Type infer_type(TypeEnv *env, ASTNode* node) {
-    if (!node) return TYPE_VOID;
+    if (!node) return TYPE_ANY;
     
     if (node->inferred_type != TYPE_UNKNOWN) {
         return node->inferred_type;
@@ -200,8 +252,10 @@ Type infer_type(TypeEnv *env, ASTNode* node) {
     Type type = TYPE_UNKNOWN;
     switch (node->type) {
         case AST_UNARY_EXPR:
+           type = infer_unary_expr_type(env, node);
            break;
-        case  AST_ASSIGNMENT_EXPR:
+        case AST_ASSIGNMENT_EXPR:
+            type = infer_assignment_expr_type(env, node);
             break;
         case AST_OBJECT_ACCESS_EXPR:
             break;
@@ -237,6 +291,5 @@ Type infer_type(TypeEnv *env, ASTNode* node) {
             break;
     }
     
-    node->inferred_type = type;
     return type;
 }

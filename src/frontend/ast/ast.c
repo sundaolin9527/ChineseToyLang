@@ -430,22 +430,8 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_LITERAL_EXPR:
-            printf("LITERAL_EXPR: %s (%s) :: %s\n", 
+            printf("LITERAL_EXPR: %s :: %s\n",
                     node->literal.value,
-                    node->literal.literal_type == LITERAL_INT8 ? "INT8" :
-                    node->literal.literal_type == LITERAL_INT16 ? "INT16" :
-                    node->literal.literal_type == LITERAL_INT32 ? "INT32" :
-                    node->literal.literal_type == LITERAL_INT64 ? "INT64" :
-                    node->literal.literal_type == LITERAL_UINT8 ? "UINT8" :
-                    node->literal.literal_type == LITERAL_UINT16 ? "UINT16" :
-                    node->literal.literal_type == LITERAL_UINT32 ? "UINT32" :
-                    node->literal.literal_type == LITERAL_UINT64 ? "UINT64" :
-                    node->literal.literal_type == LITERAL_FLOAT16 ? "FLOAT16" :
-                    node->literal.literal_type == LITERAL_FLOAT32 ? "FLOAT32" :
-                    node->literal.literal_type == LITERAL_FLOAT64 ? "FLOAT64" :
-                    node->literal.literal_type == LITERAL_STRING ? "STRING" :
-                    node->literal.literal_type == LITERAL_CHAR ? "CHAR" :
-                    node->literal.literal_type == LITERAL_BOOLEAN ? "BOOLEAN" : "UNKNOWN",
                     type_to_string(node->inferred_type));
             break;
             
