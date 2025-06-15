@@ -32,7 +32,7 @@ cd "${BUILD_DIR}"
 # 执行CMake配置
 echo "配置CMake..."
 cmake "${PROJECT_ROOT}" \
-    -DBUILD_TESTING=OFF
+    -DBUILD_TESTING=OFF # 关闭单元测试
 
 # 编译项目
 echo "开始编译..."
