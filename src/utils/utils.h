@@ -1,5 +1,9 @@
 #ifndef UTILS_H
 #define UTILS_H
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <float.h>
@@ -19,4 +23,8 @@ char* read_file(const char* filename);
 // 浮点数范围
 #define IS_FLOAT_TYPE(value, min, max) \
     ((value) >= (min) && (value) <= (max))
+
+#ifdef __cplusplus
+}
+#endif
 #endif /* UTILS_H */ 

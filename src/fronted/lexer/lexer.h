@@ -1,6 +1,8 @@
 #ifndef LEXER_H
 #define LEXER_H
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /* 定义词法单元类型*/
 typedef enum {
     TOKEN_INIT = 0,
@@ -95,4 +97,7 @@ void free_token(Token *token);
 void free_lexer(Lexer *lexer);
 
 const char* token_type_to_string(TokenType type);
+#ifdef __cplusplus
+}
+#endif
 #endif /* LEXER_H */    

@@ -1,6 +1,8 @@
 #ifndef AST_H
 #define AST_H
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "../lexer/lexer.h"
 #include "../type/type.h"
 
@@ -279,4 +281,8 @@ void free_member_list(MemberList* list);
 
 void free_ast_node(ASTNode *node);
 void print_ast(ASTNode *node, int depth);
+
+#ifdef __cplusplus
+}
+#endif
 #endif // AST_H

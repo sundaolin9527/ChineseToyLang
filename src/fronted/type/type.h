@@ -1,8 +1,10 @@
 #ifndef TYPE_H
 #define TYPE_H
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdbool.h>
-#include "../datastructure/LinkedList.h"
+#include "datastructure/LinkedList.h"
 
 typedef enum Type{
     TYPE_UNKNOWN = 0,   // 未知类型
@@ -61,4 +63,8 @@ bool add_symbol_to_scope(TypeEnv *env, char *name, Type type);
 Symbol* find_symbol_in_scope(TypeEnv *env, char *name);
 void print_currscope_symbols(TypeEnv *env);
 const char* type_to_string(Type type);
+
+#ifdef __cplusplus
+}
+#endif
 #endif // TYPE_H

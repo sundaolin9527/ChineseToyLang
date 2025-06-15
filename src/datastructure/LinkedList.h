@@ -1,6 +1,8 @@
 #ifndef LINKEDLIST_H
 #define LINKEDLIST_H
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /* 双向循环链表节点结构 
  * @member next 指向下一个节点的指针
  * @member prev 指向前一个节点的指针
@@ -186,4 +188,8 @@ do { \
             _dest->prev = _src_last; \
         } \
     } while (0)
+
+#ifdef __cplusplus
+}
+#endif
 #endif /* LINKEDLIST_H */

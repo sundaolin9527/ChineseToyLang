@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <locale.h>
 // 包含词法分析器和语法分析器的头文件
-#include "../../src/frontend/lexer/lexer.h"
-#include "../../src/frontend/parser/parser.h"
-#include "../../src/utils/util.h"
+#include "fronted/lexer/lexer.h"
+#include "fronted/parser/parser.h"
+#include "utils/utils.h"
 
 int main(int argc, char *argv[]) {
     // 设置本地化环境以支持中文
@@ -42,8 +42,7 @@ int main(int argc, char *argv[]) {
     
     // 释放内存
     free_ast_node(program);
-    free(parser);
-    free_lexer(lexer);
+    free_parser(&parser);
     free(source);
     
     return 0;

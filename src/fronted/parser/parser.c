@@ -3,7 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "parser.h"
-#include "../../utils/utils.h"
+#include "utils.h"
 
 #define PARSER_ERROR_EXIT(fmt, ...) \
     do { \
