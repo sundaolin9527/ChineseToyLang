@@ -38,6 +38,10 @@ llvm_map_components_to_libnames(llvm_libs
     BitWriter
 )
 
+# 添加LLVM头文件路径
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+
 # 子目录
 add_subdirectory(src)
 if(BUILD_TESTING)
@@ -52,11 +56,6 @@ target_include_directories(ChineseToyLang PRIVATE
 )
 target_compile_definitions(ChineseToyLang PRIVATE 
     ${LLVM_DEFINITIONS}
-)
-
-# 启用编译告警
-target_compile_options(ChineseToyLang PRIVATE
-    -Wall -Wextra -Wpedantic
 )
 
 target_link_libraries(ChineseToyLang
@@ -74,6 +73,3 @@ target_link_libraries(ChineseToyLang
     zstd::libzstd_shared
     ${CURL_LIBRARIES}
 )
-
-# 安装规则
-install(TARGETS ChineseToyLang DESTINATION bin)

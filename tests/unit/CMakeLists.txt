@@ -38,3 +38,12 @@ foreach(test_source ${TEST_SOURCES})
         ${CMAKE_SOURCE_DIR}/src
     )
 endforeach()
+
+# 新增测试目标
+add_executable(test_ir test_ir.cpp)
+target_include_directories(test_ir PRIVATE
+    ${LLVM_INCLUDE_DIRS}
+)
+target_link_libraries(test_ir
+    ${llvm_libs}
+)
