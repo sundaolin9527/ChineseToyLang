@@ -100,4 +100,4 @@ const char* token_type_to_string(TokenType type);
 #ifdef __cplusplus
 }
 #endif
-#endif /* LEXER_H */    
+#endif /* LEXER_H */

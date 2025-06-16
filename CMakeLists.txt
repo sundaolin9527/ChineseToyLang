@@ -1,53 +1,64 @@
 cmake_minimum_required(VERSION 3.15)
-project(ChineseToyLang LANGUAGES C CXX)
+project(ChineseToyLang 
+    LANGUAGES C CXX
+    VERSION 0.0.1
+)
 
-# 设置C和C++标准
+# 编译器设置
+set(CMAKE_C_COMPILER "clang-16")
+set(CMAKE_CXX_COMPILER "clang++-16")
+
+# 标准设置
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_BUILD_TYPE Debug)
 
-# 设置输出目录
+# 输出目录
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# 查找 LLVM
-find_package(LLVM REQUIRED CONFIG)
-message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+# 依赖检查
+find_package(LLVM 16 REQUIRED CONFIG)
+find_package(zstd REQUIRED)
+find_package(CURL REQUIRED)
+if(NOT LLVM_PACKAGE_VERSION VERSION_EQUAL "16.0.6")
+    message(WARNING "LLVM 16.0.6 recommended, found ${LLVM_PACKAGE_VERSION}")
+endif()
 
-# 添加 LLVM 定义和包含目录
-add_definitions(${LLVM_DEFINITIONS})
-include_directories(${LLVM_INCLUDE_DIRS})
-
-# 映射 LLVM 组件
+# LLVM 组件
 llvm_map_components_to_libnames(llvm_libs
     Core
     ExecutionEngine
     IRReader
     Support
-    native
-    bitreader
-    bitwriter
+    BitReader
+    BitWriter
 )
 
-# 添加全局包含路径
-include_directories(${CMAKE_SOURCE_DIR}/src)
-
-# 添加 src 子目录
+# 子目录
 add_subdirectory(src)
-
-# 添加测试目录
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
-# 添加主程序
+# 主程序
 add_executable(ChineseToyLang main.c)
+target_include_directories(ChineseToyLang PRIVATE
+    ${LLVM_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_compile_definitions(ChineseToyLang PRIVATE 
+    ${LLVM_DEFINITIONS}
+)
 
-# 链接所有库到主程序
+# 启用编译告警
+target_compile_options(ChineseToyLang PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
 target_link_libraries(ChineseToyLang
     utils
     datastructure
@@ -60,10 +71,9 @@ target_link_libraries(ChineseToyLang
     middle_ir
     middle_opt
     ${llvm_libs}
+    zstd::libzstd_shared
+    ${CURL_LIBRARIES}
 )
 
-# 可选：生成编译器版本信息
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/version.h
-)
+# 安装规则
+install(TARGETS ChineseToyLang DESTINATION bin)

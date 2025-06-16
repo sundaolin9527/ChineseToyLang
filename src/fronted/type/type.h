@@ -55,7 +55,7 @@ struct TypeEnv {
     Node idle_symbol; // 空闲符号链表，存放Symbol
 };
 
-TypeEnv *init_type_env();
+TypeEnv *init_type_env(void);
 void free_type_env(TypeEnv **typeEnv) ;
 void enter_scope(TypeEnv *env);
 void exit_scope(TypeEnv *env);

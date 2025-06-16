@@ -27,4 +27,4 @@ char* read_file(const char* filename);
 #ifdef __cplusplus
 }
 #endif
-#endif /* UTILS_H */ 
+#endif /* UTILS_H */

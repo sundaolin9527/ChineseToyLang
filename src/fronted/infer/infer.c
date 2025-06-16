@@ -200,4 +200,5 @@ Type infer_type(TypeEnv *env, ASTNode* node) {
         case AST_UNION_DECL: return TYPE_ANY;
         default: return TYPE_ANY;
     }
+    return TYPE_ANY;
 }

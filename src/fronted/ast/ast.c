@@ -247,6 +247,8 @@ void free_ast_node(ASTNode *node) {
         case AST_MEMBER_DECL:
             free(node->member_decl.name);
             break;
+        default:
+            break;
     }
     
     free(node);
