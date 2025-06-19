@@ -29,7 +29,7 @@ enum ValueType {
     VT_BOOL,
     VT_ANY
 };
-//clang++-16 -std=c++17 -gdwarf-4 -O0 ir.cpp $(llvm-config-16 --cxxflags --ldflags --libs) -o ir
+//clang++-17 -std=c++17 -gdwarf-4 -O0 ir.cpp $(llvm-config-17 --cxxflags --ldflags --libs) -o ir
 // 初始化类型系统
 void initTypeSystem() {
     module = std::make_unique<Module>("my_program", context);
