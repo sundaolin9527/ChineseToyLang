@@ -5,8 +5,8 @@ project(ChineseToyLang
 )
 
 # 编译器设置
-set(CMAKE_C_COMPILER "clang-17")
-set(CMAKE_CXX_COMPILER "clang++-17")
+set(CMAKE_C_COMPILER "clang-16")
+set(CMAKE_CXX_COMPILER "clang++-16")
 
 # 标准设置
 set(CMAKE_C_STANDARD 11)
@@ -21,11 +21,11 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # 依赖检查
-find_package(LLVM 17 REQUIRED CONFIG)
+find_package(LLVM 16 REQUIRED CONFIG)
 find_package(zstd REQUIRED)
 find_package(CURL REQUIRED)
-if(NOT LLVM_PACKAGE_VERSION VERSION_EQUAL "17.0.6")
-    message(WARNING "LLVM 17.0.6 recommended, found ${LLVM_PACKAGE_VERSION}")
+if(NOT LLVM_PACKAGE_VERSION VERSION_EQUAL "16.0.6")
+    message(WARNING "LLVM 16.0.6 recommended, found ${LLVM_PACKAGE_VERSION}")
 endif()
 
 # LLVM 组件
