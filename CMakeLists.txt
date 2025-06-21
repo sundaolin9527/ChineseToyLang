@@ -49,7 +49,7 @@ if(BUILD_TESTING)
 endif()
 
 # 主程序
-add_executable(ChineseToyLang main.c)
+add_executable(ChineseToyLang main.cpp)
 target_include_directories(ChineseToyLang PRIVATE
     ${LLVM_INCLUDE_DIRS}
     ${CMAKE_SOURCE_DIR}/src

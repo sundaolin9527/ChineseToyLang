@@ -1,7 +1,12 @@
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
 // 包含词法分析器和语法分析器的头文件
+
 #include "src/fronted/lexer/lexer.h"
 #include "src/fronted/parser/parser.h"
 #include "src/utils/utils.h"
@@ -47,3 +52,7 @@ int main(int argc, char *argv[]) {
     
     return 0;
 }
+
+#ifdef __cplusplus
+}
+#endif

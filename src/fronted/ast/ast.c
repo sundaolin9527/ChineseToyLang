@@ -61,7 +61,7 @@ Parameter* new_parameter(const char *name, ASTNode *default_value) {
         AST_ERROR_EXIT("内存分配失败\n");
     }
     
-    param->name = strdup(name);
+    param->name.name = strdup(name);
     param->default_value = default_value;
     param->para_cnt = 0;
     param->next = NULL;
@@ -120,7 +120,7 @@ void free_member_list(MemberList *list) {
 void free_parameter(Parameter *param) {
     if (param == NULL) return;
     
-    free(param->name);
+    free(param->name.name);
     if (param->default_value) free_ast_node(param->default_value);
     free(param);
 }
@@ -150,12 +150,12 @@ void free_ast_node(ASTNode *node) {
             break;
             
         case AST_VAR_DECL:
-            free(node->var_decl.name);
+            free(node->var_decl.name.name);
             if (node->var_decl.value) free_ast_node(node->var_decl.value);
             break;
             
         case AST_FUNC_DECL:
-            free(node->func_decl.name);
+            free(node->func_decl.name.name);
             free_parameter(node->func_decl.params);
             free_ast_node(node->func_decl.body);
             break;
@@ -171,39 +171,39 @@ void free_ast_node(ASTNode *node) {
             break;
             
         case AST_FOR_STMT:
-            free_ast_node(node->for_loop.init);
-            free_ast_node(node->for_loop.condition);
-            free_ast_node(node->for_loop.update);
-            free_ast_node(node->for_loop.body);
+            free_ast_node(node->for_stmt.init);
+            free_ast_node(node->for_stmt.condition);
+            free_ast_node(node->for_stmt.update);
+            free_ast_node(node->for_stmt.body);
             break;
             
         case AST_WHILE_STMT:
-            free_ast_node(node->while_loop.condition);
-            free_ast_node(node->while_loop.body);
+            free_ast_node(node->while_stmt.condition);
+            free_ast_node(node->while_stmt.body);
             break;
             
         case AST_RETURN_STMT:
-            free_ast_node(node->return_stmt.value);
+            free_ast_node(node->return_stmt.expression);
             break;
             
         case AST_BLOCK_STMT:
-            free_statement_list(node->block.statements);
+            free_statement_list(node->block_stmt.statements);
             break;
             
         case AST_IMPORT_STMT:
-            free(node->import.module);
+            free(node->import_stmt.name);
             break;
             
         case AST_EXPORT_STMT:
-            free(node->export.name);
+            free(node->export_stmt.name);
             break;
             
         case AST_LITERAL_EXPR:
-            free(node->literal.value);
+            free(node->literal_expr.value.name);
             break;
             
         case AST_IDENTIFIER_EXPR:
-            free(node->identifier.name);
+            free(node->identifier_expr.name);
             break;
             
         case AST_BINARY_EXPR:
@@ -216,32 +216,32 @@ void free_ast_node(ASTNode *node) {
             break;
             
         case AST_ASSIGNMENT_EXPR:
-            free_ast_node(node->assignment.left);
-            free_ast_node(node->assignment.right);
+            free_ast_node(node->assignment_expr.left);
+            free_ast_node(node->assignment_expr.right);
             break;
             
         case AST_CALL_EXPR:
-            free_ast_node(node->call.callee);
-            free_expression_list(node->call.arguments);
+            free_ast_node(node->call_expr.callee);
+            free_expression_list(node->call_expr.arguments);
             break;
             
         case AST_ARRAY_ACCESS_EXPR:
-            free_ast_node(node->array_access.object);
-            free_ast_node(node->array_access.index);
+            free_ast_node(node->array_access_expr.object);
+            free_ast_node(node->array_access_expr.index);
             break;
             
         case AST_OBJECT_ACCESS_EXPR:
-            free_ast_node(node->object_access.object);
-            free(node->object_access.property);
+            free_ast_node(node->object_access_expr.object);
+            free(node->object_access_expr.property.name);
             break;
             
         case AST_ANONYMOUS_FUNC_EXPR:
-            free_parameter(node->anonymous_func.params);
-            free_ast_node(node->anonymous_func.body);
+            free_parameter(node->anonymous_func_expr.params);
+            free_ast_node(node->anonymous_func_expr.body);
             break;
         case AST_STRUCT_DECL:
         case AST_UNION_DECL:
-            free(node->struct_or_union_decl.name);
+            free(node->struct_or_union_decl.name.name);
             free_member_list(node->struct_or_union_decl.members);
             break;
         case AST_MEMBER_DECL:
@@ -316,7 +316,7 @@ void print_ast(ASTNode *node, int depth) {
             
         case AST_VAR_DECL:
             printf("VAR_DECL: %s (%s) :: %s\n", 
-                   node->var_decl.name,
+                   node->var_decl.name.name,
                    node->var_decl.var_type == VAR_TYPE_VARIABLE ? "令" : "恒",
                    type_to_string(node->inferred_type));
             if (node->var_decl.value) {
@@ -325,7 +325,7 @@ void print_ast(ASTNode *node, int depth) {
             break;
             
         case AST_FUNC_DECL:
-            printf("FUNC_DECL: %s :: %s\n", node->func_decl.name, type_to_string(node->inferred_type));
+            printf("FUNC_DECL: %s :: %s\n", node->func_decl.name.name, type_to_string(node->inferred_type));
             
             for (int i = 0; i < depth + 1; i++) {
                 printf("  ");
@@ -335,7 +335,7 @@ void print_ast(ASTNode *node, int depth) {
             int first = 1;
             for (Parameter *param = node->func_decl.params; param; param = param->next) {
                 if (!first) printf(", ");
-                printf("%s", param->name);
+                printf("%s", param->name.name);
                 if (param->default_value) {
                     printf("=");
                     print_ast(param->default_value, depth + 2);
@@ -391,93 +391,93 @@ void print_ast(ASTNode *node, int depth) {
             
         case AST_FOR_STMT:
             printf("FOR_STMT\n");
-            print_ast(node->for_loop.init, depth + 1);
-            print_ast(node->for_loop.condition, depth + 1);
-            print_ast(node->for_loop.update, depth + 1);
-            print_ast(node->for_loop.body, depth + 1);
+            print_ast(node->for_stmt.init, depth + 1);
+            print_ast(node->for_stmt.condition, depth + 1);
+            print_ast(node->for_stmt.update, depth + 1);
+            print_ast(node->for_stmt.body, depth + 1);
             break;
             
         case AST_WHILE_STMT:
             printf("WHILE_STMT\n");
-            print_ast(node->while_loop.condition, depth + 1);
-            print_ast(node->while_loop.body, depth + 1);
+            print_ast(node->while_stmt.condition, depth + 1);
+            print_ast(node->while_stmt.body, depth + 1);
             break;
             
         case AST_RETURN_STMT:
             printf("RETURN_STMT\n");
-            if (node->return_stmt.value) {
-                print_ast(node->return_stmt.value, depth + 1);
+            if (node->return_stmt.expression) {
+                print_ast(node->return_stmt.expression, depth + 1);
             }
             break;
             
         case AST_BLOCK_STMT:
             printf("BLOCK_STMT\n");
-            for (StatementList *stmt = node->block.statements; stmt; stmt = stmt->next) {
+            for (StatementList *stmt = node->block_stmt.statements; stmt; stmt = stmt->next) {
                 print_ast(stmt->statement, depth + 1);
             }
             break;
             
         case AST_IMPORT_STMT:
-            printf("IMPORT_STMT: %s\n", node->import.module);
+            printf("IMPORT_STMT: %s\n", node->import_stmt.name);
             break;
             
         case AST_EXPORT_STMT:
-            printf("EXPORT_STMT: %s\n", node->export.name);
+            printf("EXPORT_STMT: %s\n", node->export_stmt.name);
             break;
             
         case AST_LITERAL_EXPR:
             printf("LITERAL_EXPR: %s :: %s\n",
-                    node->literal.value,
+                    node->literal_expr.value.name,
                     type_to_string(node->inferred_type));
             break;
             
         case AST_IDENTIFIER_EXPR:
-            printf("IDENTIFIER_EXPR: %s :: %s\n", node->identifier.name, type_to_string(node->inferred_type));
+            printf("IDENTIFIER_EXPR: %s :: %s\n", node->identifier_expr.name, type_to_string(node->inferred_type));
             break;
             
         case AST_BINARY_EXPR:
-            printf("BINARY_EXPR: %s :: %s\n", operator_to_string(node->binary_expr.operator), 
+            printf("BINARY_EXPR: %s :: %s\n", operator_to_string(node->binary_expr.op), 
                                 type_to_string(node->inferred_type));
             print_ast(node->binary_expr.left, depth + 1);
             print_ast(node->binary_expr.right, depth + 1);
             break;
             
         case AST_UNARY_EXPR:
-            printf("UNARY_EXPR: %s :: %s\n", operator_to_string(node->unary_expr.operator), 
+            printf("UNARY_EXPR: %s :: %s\n", operator_to_string(node->unary_expr.op), 
                           type_to_string(node->inferred_type));
             print_ast(node->unary_expr.operand, depth + 1);
             break;
             
         case AST_ASSIGNMENT_EXPR:
-            printf("ASSIGNMENT_EXPR: %s :: %s\n", operator_to_string(node->assignment.operator), 
+            printf("ASSIGNMENT_EXPR: %s :: %s\n", operator_to_string(node->assignment_expr.op), 
                      type_to_string(node->inferred_type));
-            print_ast(node->assignment.left, depth + 1);
-            print_ast(node->assignment.right, depth + 1);
+            print_ast(node->assignment_expr.left, depth + 1);
+            print_ast(node->assignment_expr.right, depth + 1);
             break;
             
         case AST_CALL_EXPR:
             printf("CALL_EXPR :: %s\n", type_to_string(node->inferred_type));
-            print_ast(node->call.callee, depth + 1);
+            print_ast(node->call_expr.callee, depth + 1);
             
             for (int i = 0; i < depth + 1; i++) {
                 printf("  ");
             }
             printf("ARGUMENTS:\n");
             
-            for (ExpressionList *arg = node->call.arguments; arg; arg = arg->next) {
+            for (ExpressionList *arg = node->call_expr.arguments; arg; arg = arg->next) {
                 print_ast(arg->expression, depth + 2);
             }
             break;
             
         case AST_ARRAY_ACCESS_EXPR:
             printf("ARRAY_ACCESS_EXPR :: %s\n", type_to_string(node->inferred_type));
-            print_ast(node->array_access.object, depth + 1);
-            print_ast(node->array_access.index, depth + 1);
+            print_ast(node->array_access_expr.object, depth + 1);
+            print_ast(node->array_access_expr.index, depth + 1);
             break;
             
         case AST_OBJECT_ACCESS_EXPR:
-            printf("OBJECT_ACCESS_EXPR %s :: %s\n", node->object_access.property, type_to_string(node->inferred_type));
-            print_ast(node->object_access.object, depth + 1);
+            printf("OBJECT_ACCESS_EXPR %s :: %s\n", node->object_access_expr.property.name, type_to_string(node->inferred_type));
+            print_ast(node->object_access_expr.object, depth + 1);
             break;
             
         case AST_ANONYMOUS_FUNC_EXPR:
@@ -489,9 +489,9 @@ void print_ast(ASTNode *node, int depth) {
             printf("PARAMS: ");
             
             first = 1;
-            for (Parameter *param = node->anonymous_func.params; param; param = param->next) {
+            for (Parameter *param = node->anonymous_func_expr.params; param; param = param->next) {
                 if (!first) printf(", ");
-                printf("%s", param->name);
+                printf("%s", param->name.name);
                 if (param->default_value) {
                     printf("=");
                     print_ast(param->default_value, depth + 2);
@@ -500,7 +500,7 @@ void print_ast(ASTNode *node, int depth) {
             }
             printf("\n");
             
-            print_ast(node->anonymous_func.body, depth + 1);
+            print_ast(node->anonymous_func_expr.body, depth + 1);
             break;
         case AST_CONTINUE_STMT:
             printf("CONTINUE_STMT\n");
@@ -509,12 +509,12 @@ void print_ast(ASTNode *node, int depth) {
             printf("BREAK_STMT\n");
             break;
         case AST_STRUCT_DECL:
-            printf("STRUCT_DECL: %s :: %s\n", node->struct_or_union_decl.name, type_to_string(node->inferred_type));
+            printf("STRUCT_DECL: %s :: %s\n", node->struct_or_union_decl.name.name, type_to_string(node->inferred_type));
             print_member_list(node->struct_or_union_decl.members, depth + 1);
             break;
             
         case AST_UNION_DECL:
-            printf("UNION_DECL: %s :: %s\n", node->struct_or_union_decl.name, type_to_string(node->inferred_type));
+            printf("UNION_DECL: %s :: %s\n", node->struct_or_union_decl.name.name, type_to_string(node->inferred_type));
             print_member_list(node->struct_or_union_decl.members, depth + 1);
             break;
             

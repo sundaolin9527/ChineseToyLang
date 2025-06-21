@@ -29,7 +29,7 @@ typedef enum Type{
     TYPE_UNION,     // 联合体
     TYPE_PTR,       // 指针类型
     TYPE_ANY,        // 任意类型
-} Type;
+} ValueType;
 
 // 符号
 #define SYMBOL_SIZE (192)  //最长64个汉字，每个汉字3字节，共192字节
@@ -37,7 +37,7 @@ typedef struct Symbol Symbol;
 struct Symbol {
     Node symbolNode;
     char symbolStr[SYMBOL_SIZE+1]; // 符号名
-    Type type;       // 符号类型
+    ValueType type;       // 符号类型
 };
 
 // 作用域
@@ -59,10 +59,10 @@ TypeEnv *init_type_env(void);
 void free_type_env(TypeEnv **typeEnv) ;
 void enter_scope(TypeEnv *env);
 void exit_scope(TypeEnv *env);
-bool add_symbol_to_scope(TypeEnv *env, char *name, Type type);
+bool add_symbol_to_scope(TypeEnv *env, char *name, ValueType type);
 Symbol* find_symbol_in_scope(TypeEnv *env, char *name);
 void print_currscope_symbols(TypeEnv *env);
-const char* type_to_string(Type type);
+const char* type_to_string(ValueType type);
 
 #ifdef __cplusplus
 }

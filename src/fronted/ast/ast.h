@@ -3,8 +3,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "../lexer/lexer.h"
-#include "../type/type.h"
+#include "fronted/lexer/lexer.h"
+#include "fronted/type/type.h"
 
 /* 抽象语法树节点类型 */
 typedef enum {
@@ -45,7 +45,7 @@ typedef enum {
 /* 变量声明类型 */
 typedef enum {
     VAR_TYPE_VARIABLE, VAR_TYPE_CONSTANT
-} VarDeclarationType;
+} VarDeclType;
 
 /* 字面量类型 */
 typedef enum {
@@ -61,7 +61,7 @@ typedef enum {
     LITERAL_FLOAT16, 
     LITERAL_FLOAT32, 
     LITERAL_FLOAT64,
-    LITERAL_STRING, 
+    LITERAL_STRING,
     LITERAL_CHAR, 
     LITERAL_BOOLEAN, 
     LITERAL_NULL
@@ -100,174 +100,178 @@ typedef enum {
     OP_MOD_ASSIGN   // %=
 } Operator;
 
-/* AST节点结构 */
+/* ====================== 前置声明 ====================== */
 typedef struct ASTNode ASTNode;
 typedef struct Parameter Parameter;
 typedef struct StatementList StatementList;
 typedef struct ExpressionList ExpressionList;
 typedef struct MemberList MemberList;
 
-/* 参数结构 */
-struct Parameter {
-    char *name;
-    ASTNode *default_value;  // 默认值表达式
-    int para_cnt; // 参数个数, 只在头节点保存
-    Parameter *next;
-};
+typedef struct StmtSequence StmtSequence;
+typedef struct VarDecl VarDecl;
+typedef struct FunctionDecl FunctionDecl;
+typedef struct StructOrUnionDecl StructOrUnionDecl;
+typedef struct IfStmt IfStmt;
+typedef struct ForStmt ForStmt;
+typedef struct WhileStmt WhileStmt;
+typedef struct SimpleStmt SimpleStmt;
+typedef struct LiteralExpr LiteralExpr;
+typedef struct BinaryExpr BinaryExpr;
+typedef struct UnaryExpr UnaryExpr;
+typedef struct CallExpr CallExpr;
+typedef struct ArrayAccessExpr ArrayAccessExpr;
+typedef struct ObjectAccessExpr ObjectAccessExpr;
+typedef struct AnoymousFuncExpr AnoymousFuncExpr;
+typedef struct Name Name;
+/* ====================== 基本类型定义 ====================== */
+typedef struct Name{
+    char* name;
+} Name;
 
-/* 语句列表 */
-struct StatementList {
-    ASTNode *statement;
-    StatementList *next;
-};
+/* 参数结构 - 用于函数参数和匿名函数参数 */
+typedef struct Parameter {
+    Name name;                  // 参数名称
+    ASTNode* default_value;     // 默认值表达式 (可为NULL)
+    int para_cnt;               // 参数个数 (仅在链表头节点有效)
+    Parameter* next;            // 下一个参数
+} Parameter;
 
-/* 表达式列表 */
-struct ExpressionList {
-    ASTNode *expression;
-    ExpressionList *next;
-};
+/* 语句链表节点 - 用于代码块和程序根节点 */
+typedef struct StatementList {
+    ASTNode* statement;         // 语句节点
+    StatementList* next;        // 下一条语句
+} StatementList;
 
-/* 结构体或联合体成员列表 */
-struct MemberList {
-    ASTNode *decl; // 嵌套的结构体/联合体（可为NULL）
-    MemberList *next;  // 成员列表
-};
+/* 表达式链表节点 - 用于函数调用参数等 */
+typedef struct ExpressionList {
+    ASTNode* expression;        // 表达式节点
+    ExpressionList* next;       // 下一个表达式
+} ExpressionList;
 
-/* AST节点 */
+/* 成员链表节点 - 用于结构体和联合体成员 */
+typedef struct MemberList {
+    ASTNode* decl;              // 成员声明节点 (可为NULL)
+    MemberList* next;           // 下一个成员
+} MemberList;
+
+/* ====================== AST 节点数据定义 ====================== */
+typedef struct StmtSequence{
+    StatementList* statements;
+} StmtSequence;
+
+/* 变量声明节点数据 */
+typedef struct VarDecl{
+    Name name;  // 变量名
+    VarDeclType var_type; // 变量或常量
+    ASTNode* value;     // 初始值表达式 (可为NULL)
+} VarDecl;
+
+/* 结构体或结构体声明节点 */
+typedef struct StructOrUnionDecl{
+    Name name;  // 可为NULL(匿名)
+    MemberList *members;
+} StructOrUnionDecl;
+
+/* 函数声明节点数据 */
+typedef struct FunctionDecl{
+    Name name;                  // 函数名
+    Parameter* params;          // 参数列表
+    ASTNode* body;              // 函数体 (块语句)
+} FunctionDecl;
+
+/* 控制结构节点数据 */
+typedef struct IfStmt{
+    ASTNode* condition;         // 条件表达式
+    ASTNode* then_branch;       // then分支
+    ASTNode* else_branch;       // else分支 (可为NULL)
+} IfStmt;
+
+typedef struct ForStmt{
+    ASTNode* init;              // 初始化表达式 (可为NULL)
+    ASTNode* condition;         // 循环条件
+    ASTNode* update;           // 更新表达式 (可为NULL)
+    ASTNode* body;             // 循环体
+} ForStmt;
+
+typedef struct WhileStmt{
+    ASTNode* condition;         // 循环条件
+    ASTNode* body;             // 循环体
+} WhileStmt;
+
+typedef struct SimpleStmt{
+    ASTNode* expression;  // 表达式或返回值
+} SimpleStmt;
+
+/* 函数调用节点 */
+typedef struct CallExpr{
+    ASTNode *callee;
+    ExpressionList *arguments;
+} CallExpr;
+
+/* 数组访问节点 */
+typedef struct ArrayAccessExpr{
+    ASTNode *object;
+    ASTNode *index;
+} ArrayAccessExpr;
+
+/* 对象访问节点 */
+typedef struct ObjectAccessExpr{
+    ASTNode *object;
+    Name property;
+} ObjectAccessExpr;
+
+/* 匿名函数节点 */
+typedef struct AnoymousFuncExpr{
+    Parameter *params;
+    ASTNode *body;  // 表达式或块语句
+} AnoymousFuncExpr;
+
+/* 表达式相关节点数据 */
+typedef struct LiteralExpr{
+    LiteralType literal_type;   // 字面量类型
+    Name value;                 // 字面量值字符串
+} LiteralExpr;
+
+typedef struct BinaryExpr{
+    Operator op;               // 操作符
+    ASTNode* left;             // 左操作数
+    ASTNode* right;            // 右操作数
+} BinaryExpr;
+
+typedef struct UnaryExpr{
+    Operator op;               // 操作符
+    ASTNode* operand;          // 操作数
+} UnaryExpr;
+
+/* ====================== AST 节点主结构 ====================== */
+/* AST 节点主结构 */
 struct ASTNode {
-    int line;
-    ASTNodeType type;
-    Type inferred_type;
+    int line;                  // 源代码行号
+    ASTNodeType type;          // 节点类型
+    ValueType inferred_type;   // 推断的类型
     union {
-        /* 程序节点 */
-        struct {
-            StatementList *statements;
-        } program;
-        
-        /* 变量声明节点 */
-        struct {
-            VarDeclarationType var_type;
-            char *name;
-            ASTNode *value;
-        } var_decl;
-        
-        /* 函数声明节点 */
-        struct {
-            char *name;
-            Parameter *params;
-            ASTNode *body;  // 块语句
-        } func_decl;
-        
-        /* 表达式语句节点 */
-        struct {
-            ASTNode *expression;
-        } expr_stmt;
-        
-        /* 条件语句节点 */
-        struct {
-            ASTNode *condition;
-            ASTNode *then_branch;
-            ASTNode *else_branch;
-        } if_stmt;
-        
-        /* for循环节点 */
-        struct {
-            ASTNode *init;
-            ASTNode *condition;
-            ASTNode *update;
-            ASTNode *body;
-        } for_loop;
-        
-        /* while循环节点 */
-        struct {
-            ASTNode *condition;
-            ASTNode *body;
-        } while_loop;
-        
-        /* 返回语句节点 */
-        struct {
-            ASTNode *value;
-        } return_stmt;
-        
-        /* 块语句节点 */
-        struct {
-            StatementList *statements;
-        } block;
-        
-        /* 导入语句节点 */
-        struct {
-            char *module;
-        } import;
-        
-        /* 导出语句节点 */
-        struct {
-            char *name;
-        } export;
-        
-        /* 字面量节点 */
-        struct {
-            LiteralType literal_type;
-            char *value;
-        } literal;
-        
-        /* 标识符节点 */
-        struct {
-            char *name;
-        } identifier;
-        
-        /* 二元表达式节点 */
-        struct {
-            Operator operator;
-            ASTNode *left;
-            ASTNode *right;
-        } binary_expr;
-        
-        /* 一元表达式节点 */
-        struct {
-            Operator operator;
-            ASTNode *operand;
-        } unary_expr;
-        
-        /* 赋值表达式节点 */
-        struct {
-            Operator operator;
-            ASTNode *left;
-            ASTNode *right;
-        } assignment;
-        
-        /* 函数调用节点 */
-        struct {
-            ASTNode *callee;
-            ExpressionList *arguments;
-        } call;
-        
-        /* 数组访问节点 */
-        struct {
-            ASTNode *object;
-            ASTNode *index;
-        } array_access;
-        
-        /* 对象访问节点 */
-        struct {
-            ASTNode *object;
-            char *property;
-        } object_access;
-        
-        /* 匿名函数节点 */
-        struct {
-            Parameter *params;
-            ASTNode *body;  // 表达式或块语句
-        } anonymous_func;
-
-        struct {
-            char *name;     // 成员名
-        } member_decl;
-
-        /* 结构体或结构体声明节点 */
-        struct {
-            char *name; // 可为NULL(匿名)
-            MemberList *members;
-        } struct_or_union_decl;
+        StmtSequence program;
+        VarDecl var_decl;
+        FunctionDecl func_decl;
+        StructOrUnionDecl struct_or_union_decl;
+        Name member_decl;
+        IfStmt if_stmt;
+        ForStmt for_stmt;
+        WhileStmt while_stmt;
+        SimpleStmt expr_stmt;
+        Name import_stmt;
+        Name export_stmt;
+        SimpleStmt return_stmt;
+        StmtSequence block_stmt;
+        LiteralExpr literal_expr;
+        Name identifier_expr;
+        BinaryExpr binary_expr;
+        UnaryExpr unary_expr;
+        BinaryExpr assignment_expr;
+        CallExpr call_expr;
+        ArrayAccessExpr array_access_expr;
+        ObjectAccessExpr object_access_expr;
+        AnoymousFuncExpr anonymous_func_expr;
     };
 };
 

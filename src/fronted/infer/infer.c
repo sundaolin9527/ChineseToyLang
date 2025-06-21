@@ -14,7 +14,7 @@
 // 3. 特殊处理：
 //    - 所有与UNKNOWN类型的运算结果都是UNKNOWN
 // 类型提升规则表（[left][right] -> result）
-static const Type type_promotion_table[TYPE_COUNT][TYPE_COUNT] = {
+static const ValueType type_promotion_table[TYPE_COUNT][TYPE_COUNT] = {
     /* 左\右       UNK           I8             I16          I32           I64           U8            U16           U32           U64           F16           F32           F64 */
     /* UNKNOWN */ {TYPE_UNKNOWN, TYPE_UNKNOWN,TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN},
     /* INT8    */ {TYPE_UNKNOWN, TYPE_INT8,   TYPE_INT16,   TYPE_INT32,   TYPE_INT64,   TYPE_INT16,   TYPE_INT16,   TYPE_INT32,   TYPE_INT64,   TYPE_FLOAT16, TYPE_FLOAT32, TYPE_FLOAT64},
@@ -31,11 +31,11 @@ static const Type type_promotion_table[TYPE_COUNT][TYPE_COUNT] = {
 };
 
 // 推断二元表达式类型
-Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
+ValueType infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
     // 获取左右操作数类型
-    Type left_type = infer_type(env, node->binary_expr.left);
-    Type right_type = infer_type(env, node->binary_expr.right);
-    Operator op = node->binary_expr.operator;
+    ValueType left_type = infer_type(env, node->binary_expr.left);
+    ValueType right_type = infer_type(env, node->binary_expr.right);
+    Operator op = node->binary_expr.op;
     
     // 任一操作数为TYPE_ANY则直接返回
     if (left_type == TYPE_ANY || right_type == TYPE_ANY) {
@@ -68,8 +68,8 @@ Type infer_binary_expr_type(TypeEnv *env, ASTNode* node) {
 }
 
 // 推断字面量类型
-Type infer_literal_type(ASTNode* node) {
-    switch (node->literal.literal_type) {
+ValueType infer_literal_type(ASTNode* node) {
+    switch (node->literal_expr.literal_type) {
         case LITERAL_INT8:    return TYPE_INT8;
         case LITERAL_INT16:   return TYPE_INT16;
         case LITERAL_INT32:   return TYPE_INT32;
@@ -90,10 +90,10 @@ Type infer_literal_type(ASTNode* node) {
 }
 
 // 推断标识符类型
-Type infer_identifier_type(TypeEnv *env, ASTNode* node) {
+ValueType infer_identifier_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_ANY;
 
-    Symbol* symbol = find_symbol_in_scope(env, node->identifier.name);
+    Symbol* symbol = find_symbol_in_scope(env, node->identifier_expr.name);
     if (symbol != NULL) {
         return symbol->type;
     }
@@ -101,10 +101,10 @@ Type infer_identifier_type(TypeEnv *env, ASTNode* node) {
 }
 
 // 推断函数调用类型
-Type infer_call_expr_type(TypeEnv *env, ASTNode* node) {
+ValueType infer_call_expr_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_ANY;
 
-    Symbol* symbol = find_symbol_in_scope(env, node->call.callee->identifier.name);
+    Symbol* symbol = find_symbol_in_scope(env, node->call_expr.callee->identifier_expr.name);
     if (symbol != NULL && symbol->type == TYPE_FUNCTION) {
         //return symbol->type->function.return_type;
     }
@@ -112,12 +112,12 @@ Type infer_call_expr_type(TypeEnv *env, ASTNode* node) {
 }
 
 // 推断数组访问类型
-Type infer_array_access_type(TypeEnv *env, ASTNode* node) {
-    return infer_type(env, node->array_access.object);
+ValueType infer_array_access_type(TypeEnv *env, ASTNode* node) {
+    return infer_type(env, node->array_access_expr.object);
 }
 
 // 获取对应的有符号类型
-Type get_signed_type(Type unsigned_type) {
+ValueType get_signed_type(ValueType unsigned_type) {
     switch(unsigned_type) {
         case TYPE_UINT8:  return TYPE_INT8;
         case TYPE_UINT16: return TYPE_INT16;
@@ -127,12 +127,12 @@ Type get_signed_type(Type unsigned_type) {
     }
 }
 
-Type infer_unary_expr_type(TypeEnv *env, ASTNode* node) {
+ValueType infer_unary_expr_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_ANY;
 
-    Type type = TYPE_ANY;
-    Type temp_type = TYPE_UNKNOWN;
-    Operator op = node->unary_expr.operator;
+    ValueType type = TYPE_ANY;
+    ValueType temp_type = TYPE_UNKNOWN;
+    Operator op = node->unary_expr.op;
 
     switch (op)
     {
@@ -156,19 +156,19 @@ Type infer_unary_expr_type(TypeEnv *env, ASTNode* node) {
     return type;
 }
 
-Type infer_assignment_expr_type(TypeEnv *env, ASTNode* node) {
+ValueType infer_assignment_expr_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_ANY;
 
-    Type type = infer_type(env, node->assignment.right);
+    ValueType type = infer_type(env, node->assignment_expr.right);
     //修正标识符的类型
-    if (node->assignment.left){
-        node->assignment.left->inferred_type = type;
+    if (node->assignment_expr.left){
+        node->assignment_expr.left->inferred_type = type;
     }
     
     return type;
 }
 
-Type infer_var_decl_type(TypeEnv *env, ASTNode* node) {
+ValueType infer_var_decl_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_ANY;
 
     if (node->var_decl.value) {
@@ -178,7 +178,7 @@ Type infer_var_decl_type(TypeEnv *env, ASTNode* node) {
 }
 
 // 主类型推断函数
-Type infer_type(TypeEnv *env, ASTNode* node) {
+ValueType infer_type(TypeEnv *env, ASTNode* node) {
     if (!node) return TYPE_ANY;
     
     if (node->inferred_type != TYPE_UNKNOWN) {

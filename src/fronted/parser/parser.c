@@ -133,7 +133,7 @@ ASTNode* parse_var_declaration(Parser *parser) {
     if (parser->current_token->type != TOKEN_IDENTIFIER) {
         SYNTAX_ERROR_EXIT(parser, "标识符", TOKEN_IDENTIFIER);
     }
-    node->var_decl.name = strdup(parser->current_token->value);
+    node->var_decl.name.name = strdup(parser->current_token->value);
     eat(parser, TOKEN_IDENTIFIER);
     
     node->var_decl.value = NULL;
@@ -147,7 +147,7 @@ ASTNode* parse_var_declaration(Parser *parser) {
     }
     eat(parser, TOKEN_SEMICOLON);
     node->inferred_type = infer_type(parser->env, node);
-    add_symbol_to_scope(parser->env, node->var_decl.name, node->inferred_type);
+    add_symbol_to_scope(parser->env, node->var_decl.name.name, node->inferred_type);
     return node;
 }
 
@@ -162,7 +162,7 @@ ASTNode* parse_func_declaration(Parser *parser) {
     if (parser->current_token->type != TOKEN_IDENTIFIER) {
         SYNTAX_ERROR_EXIT(parser, "函数名", TOKEN_IDENTIFIER);
     }
-    node->func_decl.name = strdup(parser->current_token->value);
+    node->func_decl.name.name = strdup(parser->current_token->value);
     eat(parser, TOKEN_IDENTIFIER);
     
     if (parser->current_token->type != TOKEN_LEFT_PAREN) {
@@ -308,9 +308,9 @@ ASTNode* parse_for_statement(Parser *parser) {
     if (parser->current_token->type == TOKEN_VAR ||
         parser->current_token->type == TOKEN_CONST) 
     {
-        node->for_loop.init = parse_var_declaration(parser);
+        node->for_stmt.init = parse_var_declaration(parser);
     } else if (parser->current_token->type != TOKEN_SEMICOLON) {
-        node->for_loop.init = parse_expression(parser);
+        node->for_stmt.init = parse_expression(parser);
         
         if (parser->current_token->type != TOKEN_SEMICOLON) {
             SYNTAX_ERROR_EXIT(parser, "分号", TOKEN_SEMICOLON);
@@ -322,9 +322,9 @@ ASTNode* parse_for_statement(Parser *parser) {
     
     // 条件部分
     if (parser->current_token->type != TOKEN_SEMICOLON) {
-        node->for_loop.condition = parse_expression(parser);
+        node->for_stmt.condition = parse_expression(parser);
     } else {
-        node->for_loop.condition = NULL;
+        node->for_stmt.condition = NULL;
     }
     
     if (parser->current_token->type != TOKEN_SEMICOLON) {
@@ -334,9 +334,9 @@ ASTNode* parse_for_statement(Parser *parser) {
     
     // 更新部分
     if (parser->current_token->type != TOKEN_LEFT_PAREN) {
-        node->for_loop.update = parse_expression(parser);
+        node->for_stmt.update = parse_expression(parser);
     } else {
-        node->for_loop.update = NULL;
+        node->for_stmt.update = NULL;
     }
     
     if (parser->current_token->type != TOKEN_RIGHT_PAREN) {
@@ -344,7 +344,7 @@ ASTNode* parse_for_statement(Parser *parser) {
     }
     eat(parser, TOKEN_RIGHT_PAREN);
     
-    node->for_loop.body = parse_statement(parser);
+    node->for_stmt.body = parse_statement(parser);
     
     return node;
 }
@@ -362,14 +362,14 @@ ASTNode* parse_while_statement(Parser *parser) {
     }
     eat(parser, TOKEN_LEFT_PAREN);
     
-    node->while_loop.condition = parse_expression(parser);
+    node->while_stmt.condition = parse_expression(parser);
     
     if (parser->current_token->type != TOKEN_RIGHT_PAREN) {
         SYNTAX_ERROR_EXIT(parser, "右括号", TOKEN_RIGHT_PAREN);
     }
     eat(parser, TOKEN_RIGHT_PAREN);
     
-    node->while_loop.body = parse_statement(parser);
+    node->while_stmt.body = parse_statement(parser);
     
     return node;
 }
@@ -414,9 +414,9 @@ ASTNode* parse_return_statement(Parser *parser) {
     
     eat(parser, TOKEN_RETURN);  // 消耗"返"
     
-    node->return_stmt.value = NULL;
+    node->return_stmt.expression = NULL;
     if (parser->current_token->type != TOKEN_SEMICOLON) {
-        node->return_stmt.value = parse_expression(parser);
+        node->return_stmt.expression = parse_expression(parser);
     }
     
     if (parser->current_token->type != TOKEN_SEMICOLON) {
@@ -432,7 +432,7 @@ ASTNode* parse_block_statement(Parser *parser) {
     int line = parser->current_token->line;
     
     ASTNode *node = new_ast_node(AST_BLOCK_STMT, line);
-    node->block.statements = NULL;
+    node->block_stmt.statements = NULL;
     StatementList *tail = NULL;
     ASTNode *statement = NULL;
 
@@ -445,9 +445,9 @@ ASTNode* parse_block_statement(Parser *parser) {
         
         statement = parse_statement(parser);
         
-        if (!node->block.statements) {
-            node->block.statements = new_statement_list(statement);
-            tail = node->block.statements;
+        if (!node->block_stmt.statements) {
+            node->block_stmt.statements = new_statement_list(statement);
+            tail = node->block_stmt.statements;
         } else {
             tail->next = new_statement_list(statement);
             tail = tail->next;
@@ -471,7 +471,7 @@ ASTNode* parse_import_statement(Parser *parser) {
         SYNTAX_ERROR_EXIT(parser, "字符串", TOKEN_STRING);
     }
     
-    node->import.module = strdup(parser->current_token->value);
+    node->import_stmt.name = strdup(parser->current_token->value);
     eat(parser, TOKEN_STRING);
     
     if (parser->current_token->type != TOKEN_SEMICOLON) {
@@ -494,7 +494,7 @@ ASTNode* parse_export_statement(Parser *parser) {
         SYNTAX_ERROR_EXIT(parser, "标识符", TOKEN_IDENTIFIER);
     }
     
-    node->export.name = strdup(parser->current_token->value);
+    node->export_stmt.name = strdup(parser->current_token->value);
     eat(parser, TOKEN_IDENTIFIER);
     
     if (parser->current_token->type != TOKEN_SEMICOLON) {
@@ -528,9 +528,9 @@ ASTNode* parse_assignment_expression(Parser *parser) {
         ASTNode *right = parse_assignment_expression(parser);
         
         ASTNode *node = new_ast_node(AST_ASSIGNMENT_EXPR, line);
-        node->assignment.operator = token_to_operator(tokenType);
-        node->assignment.left = left;
-        node->assignment.right = right;
+        node->assignment_expr.op = token_to_operator(tokenType);
+        node->assignment_expr.left = left;
+        node->assignment_expr.right = right;
         node->inferred_type = infer_type(parser->env, node);
         return node;
     }
@@ -551,7 +551,7 @@ ASTNode* parse_logical_or_expression(Parser *parser) {
 
         right = parse_logical_and_expression(parser);
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = token_to_operator(TOKEN_OR);
+        new_node->binary_expr.op = token_to_operator(TOKEN_OR);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -575,7 +575,7 @@ ASTNode* parse_logical_and_expression(Parser *parser) {
         right = parse_equality_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = token_to_operator(TOKEN_AND);
+        new_node->binary_expr.op = token_to_operator(TOKEN_AND);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -600,7 +600,7 @@ ASTNode* parse_equality_expression(Parser *parser) {
         right = parse_comparison_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = token_to_operator(tokenType);
+        new_node->binary_expr.op = token_to_operator(tokenType);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -628,7 +628,7 @@ ASTNode* parse_comparison_expression(Parser *parser) {
         right = parse_additive_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = token_to_operator(tokenType);
+        new_node->binary_expr.op = token_to_operator(tokenType);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -654,7 +654,7 @@ ASTNode* parse_additive_expression(Parser *parser) {
         right = parse_multiplicative_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = token_to_operator(tokenType);
+        new_node->binary_expr.op = token_to_operator(tokenType);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -679,7 +679,7 @@ ASTNode* parse_multiplicative_expression(Parser *parser) {
         
         right = parse_exponential_expression(parser);
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = token_to_operator(tokenType);
+        new_node->binary_expr.op = token_to_operator(tokenType);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -704,7 +704,7 @@ ASTNode* parse_exponential_expression(Parser *parser) {
         right = parse_unary_expression(parser);
         
         new_node = new_ast_node(AST_BINARY_EXPR, line);
-        new_node->binary_expr.operator = token_to_operator(TOKEN_POW);
+        new_node->binary_expr.op = token_to_operator(TOKEN_POW);
         new_node->binary_expr.left = node;
         new_node->binary_expr.right = right;
         
@@ -726,7 +726,7 @@ ASTNode* parse_unary_expression(Parser *parser) {
         ASTNode *operand = parse_unary_expression(parser);
         
         ASTNode *node = new_ast_node(AST_UNARY_EXPR, line);
-        node->unary_expr.operator = token_to_operator(tokenType);
+        node->unary_expr.op = token_to_operator(tokenType);
         node->unary_expr.operand = operand;
         node->inferred_type = infer_type(parser->env, node);
         return node;
@@ -772,37 +772,37 @@ ASTNode* parse_primary_expression(Parser *parser) {
     
     if (parser->current_token->type == TOKEN_NUMBER) {
         node = new_ast_node(AST_LITERAL_EXPR, line);
-        node->literal.literal_type = get_numeric_type(parser->current_token->value);
-        node->literal.value = strdup(parser->current_token->value);
+        node->literal_expr.literal_type = get_numeric_type(parser->current_token->value);
+        node->literal_expr.value.name = strdup(parser->current_token->value);
         eat(parser, TOKEN_NUMBER);
         
     } else if (parser->current_token->type == TOKEN_STRING) {
         node = new_ast_node(AST_LITERAL_EXPR, line);
-        node->literal.literal_type = LITERAL_STRING;
-        node->literal.value = strdup(parser->current_token->value);
+        node->literal_expr.literal_type = LITERAL_STRING;
+        node->literal_expr.value.name = strdup(parser->current_token->value);
         eat(parser, TOKEN_STRING);
         
     } else if (parser->current_token->type == TOKEN_CHAR) {
         node = new_ast_node(AST_LITERAL_EXPR, line);
-        node->literal.literal_type = LITERAL_CHAR;
-        node->literal.value = strdup(parser->current_token->value);
+        node->literal_expr.literal_type = LITERAL_CHAR;
+        node->literal_expr.value.name = strdup(parser->current_token->value);
         eat(parser, TOKEN_CHAR);
         
     } else if (parser->current_token->type == TOKEN_BOOLEAN) {
         node = new_ast_node(AST_LITERAL_EXPR, line);
-        node->literal.literal_type = LITERAL_BOOLEAN;
-        node->literal.value = strdup(parser->current_token->value);
+        node->literal_expr.literal_type = LITERAL_BOOLEAN;
+        node->literal_expr.value.name = strdup(parser->current_token->value);
         eat(parser, TOKEN_BOOLEAN);
         
     } else if (parser->current_token->type == TOKEN_NULL) {
         node = new_ast_node(AST_LITERAL_EXPR, line);
-        node->literal.literal_type = LITERAL_NULL;
-        node->literal.value = strdup(parser->current_token->value);
+        node->literal_expr.literal_type = LITERAL_NULL;
+        node->literal_expr.value.name = strdup(parser->current_token->value);
         eat(parser, TOKEN_NULL);
         
     } else if (parser->current_token->type == TOKEN_IDENTIFIER) {
         node = new_ast_node(AST_IDENTIFIER_EXPR, line);
-        node->identifier.name = strdup(parser->current_token->value);
+        node->identifier_expr.name = strdup(parser->current_token->value);
         eat(parser, TOKEN_IDENTIFIER);
         
     } else if (parser->current_token->type == TOKEN_LEFT_PAREN) {
@@ -826,11 +826,11 @@ ASTNode* parse_primary_expression(Parser *parser) {
             eat(parser, TOKEN_LEFT_PAREN);  // 消耗"("
             
             call_node = new_ast_node(AST_CALL_EXPR, line);
-            call_node->call.callee = node; // 要找到函数的定义(todo)
-            call_node->call.arguments = NULL;
+            call_node->call_expr.callee = node; // 要找到函数的定义(todo)
+            call_node->call_expr.arguments = NULL;
             
             if (parser->current_token->type != TOKEN_RIGHT_PAREN) {
-                call_node->call.arguments = parse_expression_list(parser);
+                call_node->call_expr.arguments = parse_expression_list(parser);
             }
             
             if (parser->current_token->type != TOKEN_RIGHT_PAREN) {
@@ -844,8 +844,8 @@ ASTNode* parse_primary_expression(Parser *parser) {
             eat(parser, TOKEN_LEFT_BRACKET);  // 消耗"["
             
             array_access_node = new_ast_node(AST_ARRAY_ACCESS_EXPR, line);
-            array_access_node->array_access.object = node;
-            array_access_node->array_access.index = parse_expression(parser);
+            array_access_node->array_access_expr.object = node;
+            array_access_node->array_access_expr.index = parse_expression(parser);
             
             if (parser->current_token->type != TOKEN_RIGHT_BRACKET) {
                 SYNTAX_ERROR_EXIT(parser, "右方括号", TOKEN_RIGHT_BRACKET);
@@ -862,8 +862,8 @@ ASTNode* parse_primary_expression(Parser *parser) {
             }
             
             object_access_node = new_ast_node(AST_OBJECT_ACCESS_EXPR, line);
-            object_access_node->object_access.object = node;
-            object_access_node->object_access.property = strdup(parser->current_token->value);
+            object_access_node->object_access_expr.object = node;
+            object_access_node->object_access_expr.property.name = strdup(parser->current_token->value);
             eat(parser, TOKEN_IDENTIFIER);
             
             node = object_access_node;
@@ -1067,7 +1067,7 @@ ASTNode* parse_struct_or_union(Parser* parser) {
     // 创建AST节点
     ASTNode* node = new_ast_node(decl_type, parser->current_token->line);
     node->inferred_type = TYPE_ANY;
-    node->struct_or_union_decl.name = name;
+    node->struct_or_union_decl.name.name = name;
     node->struct_or_union_decl.members = members;
     
     return node;
