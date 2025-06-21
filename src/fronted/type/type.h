@@ -6,7 +6,7 @@ extern "C" {
 #include <stdbool.h>
 #include "datastructure/LinkedList.h"
 
-typedef enum Type{
+typedef enum ValueType{
     TYPE_UNKNOWN = 0,   // 未知类型
     TYPE_INT8,      // 1字节有符号整型
     TYPE_INT16,     // 2字节有符号整型
