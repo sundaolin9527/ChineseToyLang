@@ -1,5 +1,4 @@
 set(IR_SOURCES
-    ir.cpp
     ir.h
 )
 
