@@ -1,7 +1,5 @@
-# 添加工具类和数据结构子目录
-add_subdirectory(utils)
-add_subdirectory(datastructure)
-
-# 添加前端和中端子目录
-add_subdirectory(fronted)
-add_subdirectory(middle)
+# 组件库构建
+add_subdirectory(Basic)
+add_subdirectory(Frontend)
+add_subdirectory(IR)
+add_subdirectory(Backend)

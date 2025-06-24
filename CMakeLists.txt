@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(ChineseToyLang 
-    LANGUAGES C CXX
-    VERSION 0.0.1
-)
+project(ChineseToyLang LANGUAGES C CXX)
 
 # 编译器设置
 set(CMAKE_C_COMPILER "clang-16")
@@ -28,48 +25,12 @@ if(NOT LLVM_PACKAGE_VERSION VERSION_EQUAL "16.0.6")
     message(WARNING "LLVM 16.0.6 recommended, found ${LLVM_PACKAGE_VERSION}")
 endif()
 
-# LLVM 组件
-llvm_map_components_to_libnames(llvm_libs
-    Core
-    ExecutionEngine
-    IRReader
-    Support
-    BitReader
-    BitWriter
-)
-
-# 添加LLVM头文件路径
-include_directories(${LLVM_INCLUDE_DIRS})
-add_definitions(${LLVM_DEFINITIONS})
-
 # 子目录
+add_subdirectory(include)
 add_subdirectory(src)
+add_subdirectory(app)
+
 if(BUILD_TESTING)
-    add_subdirectory(tests)
+    enable_testing()
+    add_subdirectory(test)
 endif()
-
-# 主程序
-add_executable(ChineseToyLang main.cpp)
-target_include_directories(ChineseToyLang PRIVATE
-    ${LLVM_INCLUDE_DIRS}
-    ${CMAKE_SOURCE_DIR}/src
-)
-target_compile_definitions(ChineseToyLang PRIVATE 
-    ${LLVM_DEFINITIONS}
-)
-
-target_link_libraries(ChineseToyLang
-    utils
-    datastructure
-    fronted_lexer
-    fronted_type
-    fronted_parser
-    fronted_ast
-    fronted_sema
-    fronted_infer
-    middle_ir
-    middle_opt
-    ${llvm_libs}
-    zstd::libzstd_shared
-    ${CURL_LIBRARIES}
-)
