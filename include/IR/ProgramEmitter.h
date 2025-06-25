@@ -1,6 +1,6 @@
 #ifndef IR_EMITTER_H
 #define IR_EMITTER_H
-#include "Emitter.h"
+#include "CommonEmitter.h"
 
 
 void EmitProgram(llvm::IRBuilder<>& Builder,

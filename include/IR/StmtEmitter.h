@@ -1,6 +1,6 @@
 #ifndef STMT_EMITTER_H
 #define STMT_EMITTER_H
-#include "Emitter.h"
+#include "CommonEmitter.h"
 
 llvm::Value* EmitStmt(llvm::IRBuilder<>& Builder,
                      llvm::LLVMContext& Context,
