@@ -100,7 +100,7 @@ void exit_scope(TypeEnv *env) {
 }
 
 // 在当前作用域添加符号
-bool add_symbol_to_scope(TypeEnv *env, char *name, ValueType type) {
+bool add_symbol_to_scope(TypeEnv *env, char *name, TypeKind type) {
     if (!env || LIST_IS_EMPTY(&(env->scopeHead)) || !name) return false;
     
     // 检查符号是否已存在
@@ -156,7 +156,7 @@ Symbol* find_symbol_in_scope(TypeEnv *env, char *name) {
 }
 
 // 打印类型名称
-const char* type_to_string(ValueType type) {
+const char* type_to_string(TypeKind type) {
     switch (type) {
         case TYPE_UNKNOWN: return "UNKNOWN";
         case TYPE_INT8: return "INT8";

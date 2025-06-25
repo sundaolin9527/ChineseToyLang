@@ -6,7 +6,7 @@ extern "C" {
 #include "Basic/Types.h"
 #include "Frontend/Ast.h"
 
-ValueType infer_type(TypeEnv *env, ASTNode* node);
+TypeKind infer_type(TypeEnv *env, ASTNode* node);
 
 #ifdef __cplusplus
 }

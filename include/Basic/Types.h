@@ -6,7 +6,7 @@ extern "C" {
 #include <stdbool.h>
 #include "Basic/LinkedList.h"
 
-typedef enum ValueType{
+typedef enum TypeKind{
     TYPE_UNKNOWN = 0,   // 未知类型
     TYPE_INT8,      // 1字节有符号整型
     TYPE_INT16,     // 2字节有符号整型
@@ -29,7 +29,7 @@ typedef enum ValueType{
     TYPE_UNION,     // 联合体
     TYPE_PTR,       // 指针类型
     TYPE_ANY,        // 任意类型
-} ValueType;
+} TypeKind;
 
 // 符号
 #define SYMBOL_SIZE (192)  //最长64个汉字，每个汉字3字节，共192字节
@@ -37,7 +37,7 @@ typedef struct Symbol Symbol;
 struct Symbol {
     Node symbolNode;
     char symbolStr[SYMBOL_SIZE+1]; // 符号名
-    ValueType type;       // 符号类型
+    TypeKind type;       // 符号类型
 };
 
 // 作用域
@@ -59,10 +59,10 @@ TypeEnv *init_type_env(void);
 void free_type_env(TypeEnv **typeEnv) ;
 void enter_scope(TypeEnv *env);
 void exit_scope(TypeEnv *env);
-bool add_symbol_to_scope(TypeEnv *env, char *name, ValueType type);
+bool add_symbol_to_scope(TypeEnv *env, char *name, TypeKind type);
 Symbol* find_symbol_in_scope(TypeEnv *env, char *name);
 void print_currscope_symbols(TypeEnv *env);
-const char* type_to_string(ValueType type);
+const char* type_to_string(TypeKind type);
 
 #ifdef __cplusplus
 }

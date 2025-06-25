@@ -133,6 +133,8 @@ typedef struct Parameter {
     Name name;                  // 参数名称
     ASTNode* default_value;     // 默认值表达式 (可为NULL)
     int para_cnt;               // 参数个数 (仅在链表头节点有效)
+    TypeKind type;
+    bool isReference;
     Parameter* next;            // 下一个参数
 } Parameter;
 
@@ -177,6 +179,7 @@ typedef struct FunctionDecl{
     Name name;                  // 函数名
     Parameter* params;          // 参数列表
     ASTNode* body;              // 函数体 (块语句)
+    TypeKind infer_type;
 } FunctionDecl;
 
 /* 控制结构节点数据 */
@@ -248,7 +251,7 @@ typedef struct UnaryExpr{
 struct ASTNode {
     int line;                  // 源代码行号
     ASTNodeType type;          // 节点类型
-    ValueType inferred_type;   // 推断的类型
+    TypeKind inferred_type;   // 推断的类型
     union {
         StmtSequence program;
         VarDecl var_decl;
