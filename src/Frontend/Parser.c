@@ -27,7 +27,7 @@
 
 ASTNode* parse_statement(Parser *parser);
 ASTNode* parse_func_declaration(Parser *parser);
-Parameter* parse_parameter_list(Parser *parser);
+Parameter* parse_parameter_list(Parser *parser, int *pcnt);
 ASTNode* parse_expression(Parser *parser);
 ASTNode* parse_assignment_expression(Parser *parser);
 ASTNode* parse_logical_or_expression(Parser *parser);
@@ -172,7 +172,7 @@ ASTNode* parse_func_declaration(Parser *parser) {
     
     node->func_decl.params = NULL;
     if (parser->current_token->type != TOKEN_RIGHT_PAREN) {
-        node->func_decl.params = parse_parameter_list(parser);
+        node->func_decl.params = parse_parameter_list(parser, &(node->func_decl.para_cnt));
     }
     
     if (parser->current_token->type != TOKEN_RIGHT_PAREN) {
@@ -186,7 +186,7 @@ ASTNode* parse_func_declaration(Parser *parser) {
 }
 
 /* 解析参数列表 */
-Parameter* parse_parameter_list(Parser *parser) {
+Parameter* parse_parameter_list(Parser *parser, int *pcnt) {
     Parameter *head = NULL;
     Parameter *tail = NULL;
     ASTNode *default_value = NULL;
@@ -215,7 +215,10 @@ Parameter* parse_parameter_list(Parser *parser) {
             tail->next = param;
             tail = param;
         }
-        head->para_cnt++;
+
+        if (pcnt != NULL) {
+            (*pcnt)++;
+        }
 
         if (parser->current_token->type != TOKEN_COMMA) {
             break;

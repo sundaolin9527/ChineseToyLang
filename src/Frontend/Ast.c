@@ -62,7 +62,6 @@ Parameter* new_parameter(const char *name, ASTNode *default_value) {
     
     param->name.name = strdup(name);
     param->default_value = default_value;
-    param->para_cnt = 0;
     param->next = NULL;
     
     return param;

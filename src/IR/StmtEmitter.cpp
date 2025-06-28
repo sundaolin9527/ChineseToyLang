@@ -307,7 +307,7 @@ llvm::Value* EmitContinueStmt(llvm::IRBuilder<>& Builder,
 llvm::Value* EmitStmt(llvm::IRBuilder<>& Builder,
                      llvm::LLVMContext& Context,
                      llvm::Module* Module,
-                     const ASTNode* stmt,
+                     ASTNode* stmt,
                      llvm::Function* currentFunction) {
     if (!stmt) return nullptr;
 

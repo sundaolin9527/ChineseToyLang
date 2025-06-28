@@ -132,8 +132,7 @@ typedef struct Name{
 typedef struct Parameter {
     Name name;                  // 参数名称
     ASTNode* default_value;     // 默认值表达式 (可为NULL)
-    int para_cnt;               // 参数个数 (仅在链表头节点有效)
-    TypeKind type;
+    TypeKind inferred_type;
     bool isReference;
     Parameter* next;            // 下一个参数
 } Parameter;
@@ -177,9 +176,9 @@ typedef struct StructOrUnionDecl{
 /* 函数声明节点数据 */
 typedef struct FunctionDecl{
     Name name;                  // 函数名
+    int para_cnt;               // 参数个数
     Parameter* params;          // 参数列表
     ASTNode* body;              // 函数体 (块语句)
-    TypeKind infer_type;
 } FunctionDecl;
 
 /* 控制结构节点数据 */

@@ -1,29 +1,33 @@
 #include "IR/DeclEmitter.h"
+#include "IR/ExprEmitter.h"
+#include <cassert>
 
 llvm::Value* EmitVarDecl(llvm::IRBuilder<>& Builder, 
                         llvm::LLVMContext& Context,
                         llvm::Module* Module,
-                        const VarDecl& decl) {
-    
-    // 1. 根据字面量类型获取LLVM类型, 先只讨论字面量
+                        ASTNode *node) {
+    if (!node) return nullptr;
+    assert(node->type == AST_VAR_DECL && "node->type != AST_VAR_DECL");
+
+    VarDecl decl = node->var_decl;
+    // 1. 根据字面量类型获取LLVM类型, 没有value先不生成
     ASTNode *value = decl.value;
-    if (value == nullptr)
-    {
-        return nullptr;
-    }
-    if 
-    llvm::Type* ty = ConvertToLLVMType(Context, Builder, value->inferred_type);
+    if (value == nullptr) return nullptr;
+
+    llvm::Type* ty = ConvertToLLVMType(Context, Builder, node->inferred_type);
     if (ty == nullptr)
     {
-        std::cerr << "Unsupported or complex type for variable: " << value->inferred_type << "\n";
+        std::cerr << "Unsupported or complex type for variable: " << node->inferred_type << "\n";
         return nullptr;
     }
+    
+    assert(decl.name.name != nullptr && "decl.name.name is null");
 
     // 2. 创建alloca指令（在栈上分配空间）
     llvm::Value* alloc = Builder.CreateAlloca(ty, nullptr, decl.name.name);
 
     // 3. 处理初始化值
-    llvm::Value* initVal = EmitLiteral(Builder, Context, Module, value->inferred_type, value);
+    llvm::Value* initVal = EmitExpr(Builder, Context, Module, value);
     Builder.CreateStore(initVal, alloc);
 
     // 4. 如果是常量，标记为不可修改
@@ -39,19 +43,25 @@ llvm::Value* EmitVarDecl(llvm::IRBuilder<>& Builder,
 llvm::Function* EmitFunctionDecl(llvm::IRBuilder<>& Builder,
                                 llvm::LLVMContext& Context,
                                 llvm::Module* Module,
-                                const FunctionDecl& funcDecl) {
+                                ASTNode *node) {
+    if (!node) return nullptr;
+    assert(node->type == AST_FUNC_DECL && "node->type != AST_FUNC_DECL");
+
+    FunctionDecl funcDecl = node->func_decl;                                    
     // 1. 转换返回类型
-    llvm::Type* retTy = ConvertToLLVMType(Context, Builder, funcDecl.infer_type);
+    llvm::Type* retTy = ConvertToLLVMType(Context, Builder, node->inferred_type);
     if (!retTy) {
-        throw CodegenError("Unsupported return type for function: " + funcDecl.name.name);
+        std::cerr << "Unsupported function return type: " << node->inferred_type << "\n";
+        return nullptr;
     }
 
     // 2. 转换参数类型
     std::vector<llvm::Type*> paramTypes;
     for (Parameter* param = funcDecl.params; param != nullptr; param = param->next) {
-        llvm::Type* ty = ConvertToLLVMType(Context, Builder, param->type);
+        llvm::Type* ty = ConvertToLLVMType(Context, Builder, param->inferred_type);
         if (!ty) {
-            throw CodegenError("Unsupported parameter type in function: " + funcDecl.name.name);
+            std::cerr << "Unsupported function parameter type: " << param->inferred_type << "\n";
+            return nullptr;
         }
         paramTypes.push_back(param->isReference ? ty->getPointerTo() : ty);
     }
@@ -81,9 +91,6 @@ llvm::Function* EmitFunctionDecl(llvm::IRBuilder<>& Builder,
         llvm::BasicBlock* entryBB = llvm::BasicBlock::Create(Context, "entry", func);
         Builder.SetInsertPoint(entryBB);
 
-        // 创建新的作用域
-        SymbolTableScope scope(SymbolTable);
-
         // 处理函数参数：在栈上分配空间并存储初始值
         idx = 0;
         for (auto& arg : func->args()) {
@@ -94,10 +101,7 @@ llvm::Function* EmitFunctionDecl(llvm::IRBuilder<>& Builder,
 
             llvm::AllocaInst* alloca = Builder.CreateAlloca(arg.getType(), nullptr, arg.getName() + ".addr");
             Builder.CreateStore(&arg, alloca);
-
-            // 添加到符号表（如果是引用类型，直接使用参数值）
-            SymbolTable.add(param->name, param->isReference ? &arg : alloca);
-            ++idx;
+            idx++;
         }
 
         // 生成函数体
@@ -124,19 +128,24 @@ llvm::Function* EmitFunctionDecl(llvm::IRBuilder<>& Builder,
 
 llvm::Type* EmitStructOrUnionDecl(llvm::LLVMContext& Context,
                                  llvm::Module* Module,
-                                 const StructOrUnionDecl& decl,
+                                 ASTNode *node,
                                  bool isPacked = false) {
+                                    
+    if (!node) return nullptr;
+    assert((node->type == AST_STRUCT_DECL || node->type == AST_UNION_DECL) && "node->type != AST_STRUCT_OR_UNION_DECL");
+    StructOrUnionDecl decl = node->struct_or_union_decl;
+
     // 1. 检查是否已生成该类型（防止递归无限循环）
-    if (!decl.name.empty()) {
-        if (auto* existingType = Module->getTypeByName(decl.name)) {
+    if (decl.name.name) {
+        if (auto* existingType = Module->getTypeByName(decl.name.name)) {
             return existingType;
         }
     }
 
     // 2. 创建不完整类型并注册（处理递归类型）
-    llvm::StructType* structType = llvm::StructType::create(Context, decl.name);
-    if (!decl.name.empty()) {
-        Module->getOrInsertType(decl.name, structType);
+    llvm::StructType* structType = llvm::StructType::create(Context, decl.name.name);
+    if (decl.name.name) {
+        Module->getOrInsertType(decl.name.name, structType);
     }
 
     // 3. 收集成员类型
@@ -144,31 +153,25 @@ llvm::Type* EmitStructOrUnionDecl(llvm::LLVMContext& Context,
     std::vector<std::string> memberNames;
     
     for (const MemberList* member = decl.members; member != nullptr; member = member->next) {
-        if (!member->decl) continue;
+        ASTNode *member_decl = member->decl;
+        if (!member_decl) continue;
 
-        switch (member->decl->type) {
+        switch (member_decl->type) {
             case AST_MEMBER_DECL: {
                 // 普通成员变量
-                const VarDecl& varDecl = member->decl->var_decl;
-                llvm::Type* memberType = getLLVMType(Context, varDecl.type);
-                
-                // 处理嵌套结构体
-                if (varDecl.type == VALUE_STRUCT || varDecl.type == VALUE_UNION) {
-                    if (varDecl.struct_decl) {
-                        memberType = EmitStructOrUnionDecl(Context, Module, *varDecl.struct_decl);
-                    }
-                }
-                
+                llvm::Type* memberType = getLLVMType(Context, member_decl->inferred_type);
                 memberTypes.push_back(memberType);
-                memberNames.push_back(varDecl.name);
+                memberNames.push_back(member_decl->member_decl.name);
                 break;
             }
-            case AST_STRUCT_OR_UNION_DECL: {
+            case AST_STRUCT_DECL: 
+            case AST_UNION_DECL: 
+            {
                 // 嵌套匿名结构体/联合体
-                const StructOrUnionDecl& nested = member->decl->struct_or_union_decl;
-                llvm::Type* nestedType = EmitStructOrUnionDecl(Context, Module, nested);
+                StructOrUnionDecl nested = member_decl->struct_or_union_decl;
+                llvm::Type* nestedType = EmitStructOrUnionDecl(Context, Module, member_decl);
                 memberTypes.push_back(nestedType);
-                memberNames.push_back(nested.name.empty() ? "anon" : nested.name);
+                memberNames.push_back(nested.name.name ?  nested.name.name : "anon");
                 break;
             }
             default:
@@ -184,25 +187,27 @@ llvm::Type* EmitStructOrUnionDecl(llvm::LLVMContext& Context,
 llvm::Value* EmitDecl(llvm::IRBuilder<>& Builder,
                      llvm::LLVMContext& Context,
                      llvm::Module* Module,
-                     const ASTNode* decl,
+                     ASTNode* decl,
                      llvm::Function* currentFunction = nullptr) {
     if (!decl) return nullptr;
 
     switch (decl->type) {
-        case AST_VAR_DECL:
+        case AST_VAR_DECL: {
             // 处理变量声明（全局/局部）
-            return EmitVarDecl(Builder, Context, Module, decl->var_decl, currentFunction);
-        
-        case AST_FUNCTION_DECL:
+            return EmitVarDecl(Builder, Context, Module, decl, currentFunction);
+        }
+        case AST_FUNCTION_DECL: {
             // 处理函数声明/定义
-            return EmitFunctionDecl(Builder, Context, Module, decl->func_decl);
-        
-        case AST_STRUCT_OR_UNION_DECL:
+            return EmitFunctionDecl(Builder, Context, Module, decl);
+        }
+        case AST_STRUCT_DECL: 
+        case AST_UNION_DECL: {
             // 处理结构体/联合体定义
-            return EmitStructOrUnionDecl(Context, Module, decl->struct_or_union_decl);
-        
-        default:
+            return EmitStructOrUnionDecl(Context, Module, decl);
+        }
+        default: {
             // 处理可执行语句（当currentFunction为nullptr时生成全局初始化代码）
             return EmitStmt(Builder, Context, Module, decl, currentFunction);
+        }
     }
 }

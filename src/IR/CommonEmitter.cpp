@@ -1,4 +1,4 @@
-#include "IR/Emitter.h"
+#include "IR/CommonEmitter.h"
 
 // 常量折叠优化
 llvm::Constant* ConstantFoldBinaryOp(Operator op, llvm::Constant* L, llvm::Constant* R, TypeKind type) {
