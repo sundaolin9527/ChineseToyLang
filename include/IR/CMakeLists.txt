@@ -3,6 +3,6 @@ target_include_directories(ChineseToyLang_headers INTERFACE
 )
 
 set(IR_HEADERS
-    IREmitter.h
+    CodeGen.h
     Pass.h
 )
