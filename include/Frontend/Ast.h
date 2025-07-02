@@ -191,7 +191,7 @@ typedef struct IfStmt{
 typedef struct ForStmt{
     ASTNode* init;              // 初始化表达式 (可为NULL)
     ASTNode* condition;         // 循环条件
-    ASTNode* update;           // 更新表达式 (可为NULL)
+    ASTNode* increase;         // 更新表达式 (可为NULL)
     ASTNode* body;             // 循环体
 } ForStmt;
 

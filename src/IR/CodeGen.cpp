@@ -1,5 +1,6 @@
-#include "IR/CodeGen.h"
 #include <cassert>
+#include <stdexcept>
+#include "IR/CodeGen.h"
 #include <llvm/Support/raw_ostream.h>
 
 // 循环上下文（用于处理break/continue）
@@ -42,7 +43,7 @@ void CodeGenerator::ExitScope() {
 // 添加符号到当前作用域
 bool CodeGenerator::AddSymbol(const std::string& name, const SymbolInfo& info) {
     if (symbolTables.empty()) {
-        enterScope();  // 确保至少有一个作用域
+        EnterScope();  // 确保至少有一个作用域
     }
 
     auto& currentScope = symbolTables.back();
@@ -56,7 +57,7 @@ bool CodeGenerator::AddSymbol(const std::string& name, const SymbolInfo& info) {
 }
 
 // 查找符号（从内到外逐层查找）
-SymbolInfo* CodeGenerator::LookupSymbol(const std::string& name) {
+CodeGenerator::SymbolInfo* CodeGenerator::LookupSymbol(const std::string& name) {
     // 反向遍历符号表（从最内层到最外层）
     for (auto it = symbolTables.rbegin(); it != symbolTables.rend(); ++it) {
         auto found = it->find(name);
@@ -67,7 +68,6 @@ SymbolInfo* CodeGenerator::LookupSymbol(const std::string& name) {
     return nullptr;  // 未找到返回nullptr
 }
 
-CodeGenerator::CodeGenerator(){}
 CodeGenerator::CodeGenerator(const std::string& moduleName)
     : Context(),
       Module(moduleName, Context),
@@ -77,19 +77,19 @@ CodeGenerator::CodeGenerator(const std::string& moduleName)
 
 llvm::Value* CodeGenerator::EmitIfStmt(const IfStmt& ifStmt, llvm::Function* currentFunction) {
     // 1. 生成条件表达式的IR
-    llvm::Value* condValue = EmitExpr(Builder, Context, Module, ifStmt.condition);
+    llvm::Value* condValue = EmitExpr(ifStmt.condition);
     
     // 2. 常量折叠优化
     if (llvm::ConstantInt* constCond = llvm::dyn_cast<llvm::ConstantInt>(condValue)) {
         // 条件为常量时的优化处理
         if (constCond->isOne()) {
             // 条件恒为真，只生成then分支
-            return EmitStmt(Builder, Context, Module, ifStmt.then_branch, currentFunction);
+            return EmitStmt(ifStmt.then_branch, currentFunction);
         } else {
             // 条件恒为假
             if (ifStmt.else_branch) {
                 // 有else分支则生成else分支
-                return EmitStmt(Builder, Context, Module, ifStmt.else_branch, currentFunction);
+                return EmitStmt(ifStmt.else_branch, currentFunction);
             }
             // 没有else分支则不生成任何代码
             return nullptr;
@@ -107,7 +107,7 @@ llvm::Value* CodeGenerator::EmitIfStmt(const IfStmt& ifStmt, llvm::Function* cur
     
     // 生成then分支
     Builder.SetInsertPoint(thenBB);
-    EmitStmt(Builder, Context, Module, ifStmt.then_branch, currentFunction);
+    EmitStmt(ifStmt.then_branch, currentFunction);
     if (!Builder.GetInsertBlock()->getTerminator()) {
         Builder.CreateBr(mergeBB);
     }
@@ -115,7 +115,7 @@ llvm::Value* CodeGenerator::EmitIfStmt(const IfStmt& ifStmt, llvm::Function* cur
     // 生成else分支（如果存在）
     if (elseBB) {
         Builder.SetInsertPoint(elseBB);
-        EmitStmt(Builder, Context, Module, ifStmt.else_branch, currentFunction);
+        EmitStmt(ifStmt.else_branch, currentFunction);
         if (!Builder.GetInsertBlock()->getTerminator()) {
             Builder.CreateBr(mergeBB);
         }
@@ -130,7 +130,7 @@ llvm::Value* CodeGenerator::EmitIfStmt(const IfStmt& ifStmt, llvm::Function* cur
 llvm::Value* CodeGenerator::EmitForStmt(const ForStmt& forStmt, llvm::Function* currentFunction) {
     // 生成初始化代码
     if (forStmt.init) {
-        EmitStmt(Builder, Context, Module, forStmt.init, currentFunction);
+        EmitStmt(forStmt.init, currentFunction);
     }
 
     // 创建基本块
@@ -144,8 +144,8 @@ llvm::Value* CodeGenerator::EmitForStmt(const ForStmt& forStmt, llvm::Function* 
 
     // 条件判断部分
     Builder.SetInsertPoint(condBB);
-    if (forStmt.cond) {
-        llvm::Value* condValue = EmitExpr(Builder, Context, Module, forStmt.cond);
+    if (forStmt.condition) {
+        llvm::Value* condValue = EmitExpr(forStmt.condition);
         Builder.CreateCondBr(condValue, bodyBB, endBB);
     } else {
         // 无条件循环
@@ -159,7 +159,7 @@ llvm::Value* CodeGenerator::EmitForStmt(const ForStmt& forStmt, llvm::Function* 
         LoopContext loopCtx = { incBB, endBB };
         PushLoopContext(loopCtx);
         
-        EmitStmt(Builder, Context, Module, forStmt.body, currentFunction);
+        EmitStmt(forStmt.body, currentFunction);
         
         PopLoopContext();
     }
@@ -169,8 +169,8 @@ llvm::Value* CodeGenerator::EmitForStmt(const ForStmt& forStmt, llvm::Function* 
 
     // 增量部分
     Builder.SetInsertPoint(incBB);
-    if (forStmt.inc) {
-        EmitExpr(Builder, Context, Module, forStmt.inc);
+    if (forStmt.increase) {
+        EmitExpr(forStmt.increase);
     }
     Builder.CreateBr(condBB);
 
@@ -190,8 +190,8 @@ llvm::Value* CodeGenerator::EmitWhileStmt(const WhileStmt& whileStmt, llvm::Func
 
     // 条件判断部分
     Builder.SetInsertPoint(condBB);
-    if (whileStmt.cond) {
-        llvm::Value* condValue = EmitExpr(Builder, Context, Module, whileStmt.cond);
+    if (whileStmt.condition) {
+        llvm::Value* condValue = EmitExpr(whileStmt.condition);
         Builder.CreateCondBr(condValue, bodyBB, endBB);
     } else {
         // 无条件循环
@@ -205,7 +205,7 @@ llvm::Value* CodeGenerator::EmitWhileStmt(const WhileStmt& whileStmt, llvm::Func
         LoopContext loopCtx = { condBB, endBB };
         PushLoopContext(loopCtx);
         
-        EmitStmt(Builder, Context, Module, whileStmt.body, currentFunction);
+        EmitStmt(whileStmt.body, currentFunction);
         
         PopLoopContext();
     }
@@ -219,9 +219,9 @@ llvm::Value* CodeGenerator::EmitWhileStmt(const WhileStmt& whileStmt, llvm::Func
 }
 
 llvm::Value* CodeGenerator::EmitExprStmt(const SimpleStmt& exprStmt, llvm::Function* currentFunction) {
-    if (exprStmt.expr) {
+    if (exprStmt.expression) {
         // 生成表达式值，但忽略返回值（除非是块中最后一个表达式）
-        return EmitExpr(Builder, Context, Module, exprStmt.expr);
+        return EmitExpr(exprStmt.expression);
     }
     return nullptr;
 }
@@ -234,7 +234,7 @@ llvm::Value* CodeGenerator::EmitImportStmt(const Name& importStmt, llvm::Functio
     // 示例：生成对__import_<module>的调用
     llvm::FunctionType* importFuncType = llvm::FunctionType::get(
         llvm::Type::getVoidTy(Context), false);
-    llvm::Function* importFunc = Module->getFunction("__import_" + moduleName);
+    llvm::Function* importFunc = Module.getFunction("__import_" + moduleName);
     if (!importFunc) {
         importFunc = llvm::Function::Create(
             importFuncType, llvm::Function::ExternalLinkage,
@@ -247,7 +247,7 @@ llvm::Value* CodeGenerator::EmitImportStmt(const Name& importStmt, llvm::Functio
 
 llvm::Value* CodeGenerator::EmitExportStmt(const Name& exportStmt, llvm::Function* currentFunction) {
     // 设置符号的链接属性
-    if (llvm::GlobalValue* gv = Module->getNamedValue(exportStmt.name)) {
+    if (llvm::GlobalValue* gv = Module.getNamedValue(exportStmt.name)) {
         gv->setLinkage(llvm::GlobalValue::ExternalLinkage);
         gv->setDSOLocal(true);
     }
@@ -255,18 +255,18 @@ llvm::Value* CodeGenerator::EmitExportStmt(const Name& exportStmt, llvm::Functio
 }
 
 llvm::Value* CodeGenerator::EmitReturnStmt(const SimpleStmt& returnStmt, llvm::Function* currentFunction) {
-    if (returnStmt.expr) {
-        llvm::Value* retVal = EmitExpr(Builder, Context, Module, returnStmt.expr);
+    if (returnStmt.expression) {
+        llvm::Value* retVal = EmitExpr(returnStmt.expression);
         // 检查返回值类型是否匹配函数返回类型
         if (retVal->getType() != currentFunction->getReturnType()) {
-            throw CodegenError("Return type mismatch in function " + 
+            throw std::runtime_error("Return type mismatch in function " + 
                              currentFunction->getName().str());
         }
         Builder.CreateRet(retVal);
     } else {
         // 检查函数是否确实返回void
         if (!currentFunction->getReturnType()->isVoidTy()) {
-            throw CodegenError("Void return in non-void function " +
+            throw std::runtime_error("Void return in non-void function " +
                              currentFunction->getName().str());
         }
         Builder.CreateRetVoid();
@@ -276,20 +276,20 @@ llvm::Value* CodeGenerator::EmitReturnStmt(const SimpleStmt& returnStmt, llvm::F
 
 llvm::Value* CodeGenerator::EmitBlockStmt(const StmtSequence& blockStmt, llvm::Function* currentFunction) {
     // 创建新的作用域
-    SymbolTableScope scope(SymbolTable);
+    EnterScope();
     
     llvm::Value* lastValue = nullptr;
     
     // 生成块内所有语句
-    for (const ASTNode* stmt : blockStmt.stmts) {
-        lastValue = EmitStmt(Builder, Context, Module, stmt, currentFunction);
+    for (StatementList* stmt = blockStmt.statements; stmt != nullptr; stmt = stmt->next) {
+        lastValue = EmitStmt(stmt->statement, currentFunction);
         
         // 如果遇到终止语句（如return），提前结束
         if (Builder.GetInsertBlock()->getTerminator()) {
             break;
         }
     }
-    
+    ExitScope();
     // 返回最后一个表达式的值（如果是表达式块）
     return lastValue;
 }
@@ -313,194 +313,270 @@ llvm::Value* CodeGenerator::EmitStmt(ASTNode* stmt, llvm::Function* currentFunct
 
     switch (stmt->type) {
         case AST_IF_STMT:
-            return EmitIfStmt(Builder, Context, Module, stmt->if_stmt, currentFunction);
+            return EmitIfStmt(stmt->if_stmt, currentFunction);
         
         case AST_FOR_STMT:
-            return EmitForStmt(Builder, Context, Module, stmt->for_stmt, currentFunction);
+            return EmitForStmt(stmt->for_stmt, currentFunction);
         
         case AST_WHILE_STMT:
-            return EmitWhileStmt(Builder, Context, Module, stmt->while_stmt, currentFunction);
+            return EmitWhileStmt(stmt->while_stmt, currentFunction);
         
         case AST_EXPR_STMT:
-            return EmitExprStmt(Builder, Context, Module, stmt->expr_stmt, currentFunction);
+            return EmitExprStmt(stmt->expr_stmt, currentFunction);
         
         case AST_IMPORT_STMT:
-            return EmitImportStmt(Builder, Context, Module, stmt->import_stmt, currentFunction);
+            return EmitImportStmt(stmt->import_stmt, currentFunction);
         
         case AST_EXPORT_STMT:
-            return EmitExportStmt(Builder, Context, Module, stmt->export_stmt, currentFunction);
+            return EmitExportStmt(stmt->export_stmt, currentFunction);
         
         case AST_RETURN_STMT:
-            return EmitReturnStmt(Builder, Context, Module, stmt->return_stmt, currentFunction);
+            return EmitReturnStmt(stmt->return_stmt, currentFunction);
         
         case AST_BLOCK_STMT:
-            return EmitBlockStmt(Builder, Context, Module, stmt->block_stmt, currentFunction);
+            return EmitBlockStmt(stmt->block_stmt, currentFunction);
         
         case AST_VAR_DECL:
-            return EmitVarDecl(Builder, Context, Module, stmt->var_decl, currentFunction);
+            return EmitVarDecl(stmt);
         
-        case AST_FUNCTION_DECL:
-            return EmitFunctionDecl(Builder, Context, Module, stmt->func_decl);
+        case AST_FUNC_DECL:
+            return EmitFunctionDecl(stmt);
         
         case AST_BREAK_STMT:
-            return EmitBreakStmt(Builder, Context, Module, stmt->line, currentFunction);
+            return EmitBreakStmt();
         
         case AST_CONTINUE_STMT:
-            return EmitContinueStmt(Builder, Context, Module, stmt->line, currentFunction);
+            return EmitContinueStmt();
 
         default:
-            throw CodegenError("Unknown statement type at line " + std::to_string(stmt->line));
+            throw std::runtime_error("Unknown statement type at line " + std::to_string(stmt->line));
     }
 }
 
-llvm::Value* CodeGenerator::EmitLiteralExpr(TypeKind type, const void *value) 
+llvm::Value* CodeGenerator::EmitLiteralExpr(ASTNode* node) 
 {
-  // 如果未传入 Module，尝试从 Builder 获取
-  if (!Module && Builder.GetInsertBlock()) {
-    Module = Builder.GetInsertBlock()->getModule();
-  }
-  switch (type) {
+    if (node == nullptr) return nullptr;
+    
+    switch (node->inferred_type) {
     // 整数类型
     case TYPE_INT8:
-      return llvm::ConstantInt::get(Context, llvm::APInt(8, *(int8_t*)value, true));
+        return llvm::ConstantInt::get(Context, llvm::APInt(8, *(int8_t*)node->literal_expr.value, true));
     case TYPE_INT16:
-      return llvm::ConstantInt::get(Context, llvm::APInt(16, *(int16_t*)value, true));
+        return llvm::ConstantInt::get(Context, llvm::APInt(16, *(int16_t*)node->literal_expr.value, true));
     case TYPE_INT32:
-      return llvm::ConstantInt::get(Context, llvm::APInt(32, *(int32_t*)value, true));
+        return llvm::ConstantInt::get(Context, llvm::APInt(32, *(int32_t*)node->literal_expr.value, true));
     case TYPE_INT64:
-      return llvm::ConstantInt::get(Context, llvm::APInt(64, *(int64_t*)value, true));
+        return llvm::ConstantInt::get(Context, llvm::APInt(64, *(int64_t*)node->literal_expr.value, true));
 
     // 无符号整数
     case TYPE_UINT8:
-      return llvm::ConstantInt::get(Context, llvm::APInt(8, *(uint8_t*)value, false));
+        return llvm::ConstantInt::get(Context, llvm::APInt(8, *(uint8_t*)node->literal_expr.value, false));
     case TYPE_UINT16:
-      return llvm::ConstantInt::get(Context, llvm::APInt(16, *(uint16_t*)value, false));
+        return llvm::ConstantInt::get(Context, llvm::APInt(16, *(uint16_t*)node->literal_expr.value, false));
     case TYPE_UINT32:
-      return llvm::ConstantInt::get(Context, llvm::APInt(32, *(uint32_t*)value, false));
+        return llvm::ConstantInt::get(Context, llvm::APInt(32, *(uint32_t*)node->literal_expr.value, false));
     case TYPE_UINT64:
-      return llvm::ConstantInt::get(Context, llvm::APInt(64, *(uint64_t*)value, false));
+        return llvm::ConstantInt::get(Context, llvm::APInt(64, *(uint64_t*)node->literal_expr.value, false));
 
     // 浮点数
     case TYPE_FLOAT16:
-      return llvm::ConstantFP::get(Context, llvm::APFloat(llvm::APFloat::IEEEhalf(), *(uint16_t*)value));
+        return llvm::ConstantFP::get(Context, llvm::APFloat(llvm::APFloat::IEEEhalf(), *(uint16_t*)node->literal_expr.value));
     case TYPE_FLOAT32:
-      return llvm::ConstantFP::get(Context, llvm::APFloat(*(float*)value));
+        return llvm::ConstantFP::get(Context, llvm::APFloat(*(float*)node->literal_expr.value));
     case TYPE_FLOAT64:
-      return llvm::ConstantFP::get(Context, llvm::APFloat(*(double*)value));
+        return llvm::ConstantFP::get(Context, llvm::APFloat(*(double*)node->literal_expr.value));
 
     // 字符串
     case TYPE_STRING: {
-      const char *str = (const char*)value;
-      llvm::Constant *StrConst = llvm::ConstantDataArray::getString(Context, str);
-      
-      if (!Module) {
-        // 如果没有 Module，无法创建全局变量，返回 nullptr 或报错
-        return nullptr;
-      }
+        const char *str = (const char*)node->literal_expr.value;
+        llvm::Constant *StrConst = llvm::ConstantDataArray::getString(Context, str);
 
-      llvm::GlobalVariable *GV = new llvm::GlobalVariable(
-          *Module,
-          StrConst->getType(),
-          true,
-          llvm::GlobalValue::PrivateLinkage,
-          StrConst,
-          "str.literal");
+        llvm::GlobalVariable *GV = new llvm::GlobalVariable(
+            Module,
+            StrConst->getType(),
+            true,
+            llvm::GlobalValue::PrivateLinkage,
+            StrConst,
+            "str.literal");
 
-      if (Builder.GetInsertBlock()) {
+        if (Builder.GetInsertBlock()) {
         // 如果有插入点，生成 GEP 指令
         return Builder.CreateInBoundsGEP(
             GV->getValueType(),
             GV,
             {Builder.getInt32(0), Builder.getInt32(0)});
-      } else {
+        } else {
         // 全局初始化，直接返回全局变量
         return GV;
-      }
+        }
     }
 
     // 字符
     case TYPE_CHAR:
-      return llvm::ConstantInt::get(Context, llvm::APInt(8, *(char*)value, false));
+        return llvm::ConstantInt::get(Context, llvm::APInt(8, *(char*)node->literal_expr.value, false));
 
     // 布尔值
     case TYPE_BOOLEAN:
-      return llvm::ConstantInt::get(Context, llvm::APInt(1, *(bool*)value, false));
+        return llvm::ConstantInt::get(Context, llvm::APInt(1, *(bool*)node->literal_expr.value, false));
 
     // NULL（指针）
     case TYPE_PTR:
-      return llvm::ConstantPointerNull::get(Builder.getPtrTy());
+        return llvm::ConstantPointerNull::get(Builder.getPtrTy());
 
     default:
-      return nullptr;  // 其他
-  }
+        return nullptr;  // 其他
+    }
 }
 
 llvm::Value* CodeGenerator::EmitIdentifierExpr(ASTNode* expr) {
-    llvm::Value* var = LookupSymbol(expr->identifier_expr.name);
-    if (!var) throw CodegenError("Undefined variable: " + expr->identifier_expr.name.name);
-    return Builder.CreateLoad(getLLVMType(expr->inferred_type), var, expr->identifier_expr.name);
+    llvm::Value* var = LookupSymbol((expr->identifier_expr).name);
+    if (!var) throw std::runtime_error("Undefined variable: " + (expr->identifier_expr).name);
+    return Builder.CreateLoad(ConvertToLLVMType(expr->inferred_type), var, (expr->identifier_expr).name);
 }
 
 llvm::Value* CodeGenerator::EmitBinaryExpr(ASTNode* expr) {
+    assert(expr->type == AST_BINARY_EXPR && "Expected binary expression node");
     const BinaryExpr& bin = expr->binary_expr;
-    llvm::Value* L = EmitExpr(Builder, Context, Module, bin.left);
-    llvm::Value* R = EmitExpr(Builder, Context, Module, bin.right);
-    
-    // 常量折叠优化
-    if (llvm::Constant* LC = llvm::dyn_cast<llvm::Constant>(L))
-        if (llvm::Constant* RC = llvm::dyn_cast<llvm::Constant>(R))
-            if (llvm::Constant* folded = ConstantFoldBinaryOp(bin.op, LC, RC, expr->inferred_type))
-                return folded;
 
+    // 1. 生成左右子表达式的IR
+    llvm::Value* L = EmitExpr(bin.left);
+    llvm::Value* R = EmitExpr(bin.right);
+    
+    // 2. 获取统一的LLVM类型（处理类型提升）
+    llvm::Type* type = ConvertToLLVMType(expr->inferred_type);
+
+    // 3. 常量折叠优化（如果两边都是常量）
+    if (llvm::isa<llvm::Constant>(L) && llvm::isa<llvm::Constant>(R)) {
+        if (llvm::Constant* folded = ConstantFoldBinaryOp(bin.op, 
+            llvm::cast<llvm::Constant>(L), 
+            llvm::cast<llvm::Constant>(R),
+            expr->inferred_type)) {
+            return folded;
+        }
+    }
+
+    // 4. 根据运算符类型生成对应IR
     switch (bin.op) {
-        case OP_ADD: return createArithOp(Builder, L, R, expr->inferred_type, true);
-        case OP_SUB: return createArithOp(Builder, L, R, expr->inferred_type, false);
-        case OP_MUL: return createMulOp(Builder, L, R, expr->inferred_type);
-        case OP_DIV: return createDivOp(Builder, L, R, expr->inferred_type);
-        case OP_LT: case OP_LE: case OP_GT: case OP_GE: case OP_EQ: case OP_NE:
-            return createCmpOp(Builder, bin.op, L, R, expr->inferred_type);
-        case OP_AND: return Builder.CreateAnd(L, R, "andtmp");
-        case OP_OR:  return Builder.CreateOr(L, R, "ortmp");
+        // 算术运算
+        case OP_PLUS: 
+            return Builder.CreateAdd(L, R, "addtmp");
+        case OP_MINUS: 
+            return Builder.CreateSub(L, R, "subtmp");
+        case OP_STAR: 
+            return Builder.CreateMul(L, R, "multmp");
+        case OP_SLASH:
+            if (type->isFPOrFPVectorTy()) {
+                return Builder.CreateFDiv(L, R, "fdivtmp");
+            } else {
+                return Builder.CreateSDiv(L, R, "sdivtmp");
+            }
+
+        // 比较运算
+        case OP_LT: case OP_LE: case OP_GT: case OP_GE: case OP_EQ: case OP_NE: {
+            llvm::CmpInst::Predicate pred;
+            if (type->isFPOrFPVectorTy()) {
+                // 浮点比较
+                switch (bin.op) {
+                    case OP_LT: pred = llvm::CmpInst::FCMP_OLT; break;
+                    case OP_LE: pred = llvm::CmpInst::FCMP_OLE; break;
+                    case OP_GT: pred = llvm::CmpInst::FCMP_OGT; break;
+                    case OP_GE: pred = llvm::CmpInst::FCMP_OGE; break;
+                    case OP_EQ: pred = llvm::CmpInst::FCMP_OEQ; break;
+                    case OP_NE: pred = llvm::CmpInst::FCMP_ONE; break;
+                    default: llvm_unreachable("Invalid FP comparison");
+                }
+                return Builder.CreateFCmp(pred, L, R, "fcmptmp");
+            } else {
+                // 整数比较
+                switch (bin.op) {
+                    case OP_LT: pred = llvm::CmpInst::ICMP_SLT; break;
+                    case OP_LE: pred = llvm::CmpInst::ICMP_SLE; break;
+                    case OP_GT: pred = llvm::CmpInst::ICMP_SGT; break;
+                    case OP_GE: pred = llvm::CmpInst::ICMP_SGE; break;
+                    case OP_EQ: pred = llvm::CmpInst::ICMP_EQ;  break;
+                    case OP_NE: pred = llvm::CmpInst::ICMP_NE;  break;
+                    default: llvm_unreachable("Invalid integer comparison");
+                }
+                return Builder.CreateICmp(pred, L, R, "icmptmp");
+            }
+        }
+
+        // 逻辑运算（布尔类型）
+        case OP_AND: case OP_OR: {
+            // 创建基本块实现短路求值
+            llvm::Function* func = Builder.GetInsertBlock()->getParent();
+            llvm::BasicBlock* lhsBlock = Builder.GetInsertBlock();
+            llvm::BasicBlock* rhsBlock = llvm::BasicBlock::Create(Context, "bin.rhs", func);
+            llvm::BasicBlock* mergeBlock = llvm::BasicBlock::Create(Context, "bin.merge", func);
+
+            // 根据运算符选择分支条件
+            if (bin.op == OP_AND) {
+                Builder.CreateCondBr(L, rhsBlock, mergeBlock);
+            } else { // OP_OR
+                Builder.CreateCondBr(L, mergeBlock, rhsBlock);
+            }
+
+            // 处理右操作数
+            Builder.SetInsertPoint(rhsBlock);
+            llvm::Value* rhsVal = EmitExpr(bin.right);
+            Builder.CreateBr(mergeBlock);
+            rhsBlock = Builder.GetInsertBlock(); // 可能被改变
+
+            // 创建PHI节点合并结果
+            Builder.SetInsertPoint(mergeBlock);
+            llvm::PHINode* phi = Builder.CreatePHI(type, 2, "bintmp");
+            if (bin.op == OP_AND) {
+                phi->addIncoming(llvm::ConstantInt::get(type, 0), lhsBlock);
+                phi->addIncoming(rhsVal, rhsBlock);
+            } else {
+                phi->addIncoming(llvm::ConstantInt::get(type, 1), lhsBlock);
+                phi->addIncoming(rhsVal, rhsBlock);
+            }
+            return phi;
+        }
+
         default:
-            throw CodegenError("Unknown binary operator at line " + std::to_string(expr->line));
+            throw std::runtime_error("Unsupported binary operator at line " + 
+                              std::to_string(expr->line));
     }
 }
 
 llvm::Value* CodeGenerator::EmitAssignmentExpr(const ASTNode* expr) {
     const BinaryExpr& assign = expr->assignment_expr;
     if (!assign.left || assign.left->type != AST_IDENTIFIER_EXPR)
-        throw CodegenError("Invalid assignment target at line " + std::to_string(expr->line));
+        throw std::runtime_error("Invalid assignment target at line " + std::to_string(expr->line));
 
-    llvm::Value* rhs = EmitExpr(Builder, Context, Module, assign.right);
+    llvm::Value* rhs = EmitExpr(assign.right);
     llvm::Value* var = LookupSymbol(assign.left->identifier_expr.name);
-    if (!var) throw CodegenError("Undefined variable: " + assign.left->identifier_expr.name);
+    if (!var) throw std::runtime_error("Undefined variable: " + assign.left->identifier_expr.name);
     
     Builder.CreateStore(rhs, var);
     return rhs;
 }
 
+/*
 llvm::Value* CodeGenerator::EmitCallExpr(const ASTNode* expr) {
     const CallExpr& call = expr->call_expr;
-    llvm::Function* callee = Module->getFunction(call.func_name);
+    llvm::Function* callee = Module.getFunction(call.callee->);
     if (!callee)
-        throw CodegenError("Unknown function: " + call.func_name + " at line " + std::to_string(expr->line));
+        throw std::runtime_error("Unknown function: " + call.func_name + " at line " + std::to_string(expr->line));
 
     std::vector<llvm::Value*> args;
     for (const ASTNode* arg : call.args) {
-        args.push_back(EmitExpr(Builder, Context, Module, arg));
+        args.push_back(EmitExpr(arg));
         if (!args.back()) return nullptr;
     }
 
     if (callee->arg_size() != args.size())
-        throw CodegenError("Argument count mismatch for " + call.func_name);
+        throw std::runtime_error("Argument count mismatch for " + call.func_name);
 
     return Builder.CreateCall(callee, args, "calltmp");
 }
 
 llvm::Value* CodeGenerator::EmitArrayAccessExpr(const ASTNode* expr) {
     const ArrayAccessExpr& arr = expr->array_access_expr;
-    llvm::Value* array = EmitExpr(Builder, Context, Module, arr.array);
-    llvm::Value* index = EmitExpr(Builder, Context, Module, arr.index);
+    llvm::Value* array = EmitExpr(arr.array);
+    llvm::Value* index = EmitExpr(arr.index);
     
     if (EnableBoundsChecking) {
         emitBoundsCheck(Builder, array, index, expr->line);
@@ -512,11 +588,11 @@ llvm::Value* CodeGenerator::EmitArrayAccessExpr(const ASTNode* expr) {
 
 llvm::Value* CodeGenerator::EmitObjectAccessExpr(const ASTNode* expr) {
     const ObjectAccessExpr& obj = expr->object_access_expr;
-    llvm::Value* object = EmitExpr(Builder, Context, Module, obj.object);
+    llvm::Value* object = EmitExpr(obj.object);
     
     if (!object->getType()->isPointerTy() || 
         !object->getType()->getPointerElementType()->isStructTy()) {
-        throw CodegenError("Invalid object access at line " + std::to_string(expr->line));
+        throw std::runtime_error("Invalid object access at line " + std::to_string(expr->line));
     }
 
     llvm::StructType* structTy = llvm::cast<llvm::StructType>(
@@ -524,7 +600,7 @@ llvm::Value* CodeGenerator::EmitObjectAccessExpr(const ASTNode* expr) {
     
     int memberIdx = getStructMemberIndex(structTy, obj.member_name);
     if (memberIdx == -1) {
-        throw CodegenError("Unknown member '" + obj.member_name + 
+        throw std::runtime_error("Unknown member '" + obj.member_name + 
                           "' at line " + std::to_string(expr->line));
     }
 
@@ -558,7 +634,7 @@ llvm::Value* CodeGenerator::EmitAnonymousFuncExpr(const ASTNode* expr) {
         SymbolTable.add(anon.parameters[idx++].name, &arg);
     }
     
-    llvm::Value* bodyVal = EmitStmt(Builder, Context, Module, anon.body, func);
+    llvm::Value* bodyVal = EmitStmt(anon.body, func);
     
     if (!Builder.GetInsertBlock()->getTerminator()) {
         if (anon.return_type == VALUE_VOID) {
@@ -570,20 +646,20 @@ llvm::Value* CodeGenerator::EmitAnonymousFuncExpr(const ASTNode* expr) {
     
     return func;
 }
-
+*/
 llvm::Value* CodeGenerator::EmitExpr(const ASTNode* expr) {
     if (!expr) return nullptr;
 
     switch (expr->type) {
-        case AST_LITERAL_EXPR:    return EmitLiteralExpr(Builder, Context, Module, expr);
-        case AST_IDENTIFIER_EXPR: return EmitIdentifierExpr(Builder, Context, Module, expr);
-        case AST_BINARY_EXPR:     return EmitBinaryExpr(Builder, Context, Module, expr);
-        case AST_ASSIGNMENT_EXPR: return EmitAssignmentExpr(Builder, Context, Module, expr);
-        case AST_CALL_EXPR:       return EmitCallExpr(Builder, Context, Module, expr);
-        case AST_ARRAY_ACCESS_EXPR: return EmitArrayAccessExpr(Builder, Context, Module, expr);
-        case AST_OBJECT_ACCESS_EXPR: return EmitObjectAccessExpr(Builder, Context, Module, expr);
-        case AST_ANONYMOUS_FUNC_EXPR: return EmitAnonymousFuncExpr(Builder, Context, Module, expr);
-        default: throw CodegenError("Unsupported expression type at line " + std::to_string(expr->line));
+        case AST_LITERAL_EXPR:    return EmitLiteralExpr(expr);
+        case AST_IDENTIFIER_EXPR: return EmitIdentifierExpr(expr);
+        case AST_BINARY_EXPR:     return EmitBinaryExpr(expr);
+        case AST_ASSIGNMENT_EXPR: return EmitAssignmentExpr(expr);
+        //case AST_CALL_EXPR:       return EmitCallExpr(expr);
+        //case AST_ARRAY_ACCESS_EXPR: return EmitArrayAccessExpr(expr);
+        // AST_OBJECT_ACCESS_EXPR: return EmitObjectAccessExpr(expr);
+        //case AST_ANONYMOUS_FUNC_EXPR: return EmitAnonymousFuncExpr(expr);
+        default: throw std::runtime_error("Unsupported expression type at line " + std::to_string(expr->line));
     }
 }
 
@@ -609,7 +685,7 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
     llvm::Value* alloc = Builder.CreateAlloca(ty, nullptr, decl.name.name);
 
     // 3. 处理初始化值
-    llvm::Value* initVal = EmitExpr(Builder, Context, Module, value);
+    llvm::Value* initVal = EmitExpr(value);
     Builder.CreateStore(initVal, alloc);
 
     // 4. 如果是常量，标记为不可修改
@@ -685,14 +761,14 @@ llvm::Function* CodeGenerator::EmitFunctionDecl(ASTNode *node) {
 
         // 生成函数体
         try {
-            EmitStmt(Builder, Context, Module, funcDecl.body, func);
+            EmitStmt(funcDecl.body, func);
 
             // 确保函数有终止指令
             if (!Builder.GetInsertBlock()->getTerminator()) {
                 if (retTy->isVoidTy()) {
                     Builder.CreateRetVoid();
                 } else {
-                    throw CodegenError("Non-void function missing return statement");
+                    throw std::runtime_error("Non-void function missing return statement");
                 }
             }
         } catch (const CodegenError& e) {
@@ -713,7 +789,7 @@ llvm::Type* CodeGenerator::EmitStructOrUnionDecl(ASTNode *node, bool isPacked = 
 
     // 1. 检查是否已生成该类型（防止递归无限循环）
     if (decl.name.name) {
-        if (auto* existingType = Module->getTypeByName(decl.name.name)) {
+        if (auto* existingType = Module.getTypeByName(decl.name.name)) {
             return existingType;
         }
     }
@@ -721,7 +797,7 @@ llvm::Type* CodeGenerator::EmitStructOrUnionDecl(ASTNode *node, bool isPacked = 
     // 2. 创建不完整类型并注册（处理递归类型）
     llvm::StructType* structType = llvm::StructType::create(Context, decl.name.name);
     if (decl.name.name) {
-        Module->getOrInsertType(decl.name.name, structType);
+        Module.getOrInsertType(decl.name.name, structType);
     }
 
     // 3. 收集成员类型
@@ -751,7 +827,7 @@ llvm::Type* CodeGenerator::EmitStructOrUnionDecl(ASTNode *node, bool isPacked = 
                 break;
             }
             default:
-                throw CodegenError("Unsupported member type in struct/union");
+                throw std::runtime_error("Unsupported member type in struct/union");
         }
     }
 
@@ -766,11 +842,11 @@ llvm::Value* CodeGenerator::EmitDecl(ASTNode* decl, llvm::Function* currentFunct
     switch (decl->type) {
         case AST_VAR_DECL: {
             // 处理变量声明（全局/局部）
-            return EmitVarDecl(Builder, Context, Module, decl, currentFunction);
+            return EmitVarDecl(decl, currentFunction);
         }
-        case AST_FUNCTION_DECL: {
+        case AST_FUNC_DECL: {
             // 处理函数声明/定义
-            return EmitFunctionDecl(Builder, Context, Module, decl);
+            return EmitFunctionDecl(decl);
         }
         case AST_STRUCT_DECL: 
         case AST_UNION_DECL: {
@@ -779,7 +855,7 @@ llvm::Value* CodeGenerator::EmitDecl(ASTNode* decl, llvm::Function* currentFunct
         }
         default: {
             // 处理可执行语句（当currentFunction为nullptr时生成全局初始化代码）
-            return EmitStmt(Builder, Context, Module, decl, currentFunction);
+            return EmitStmt(decl, currentFunction);
         }
     }
 }
@@ -930,14 +1006,14 @@ void CodeGenerator::EmitProgram(ASTNode *node) {
         if (!stmtNode->statement) continue;
 
         // 统一通过 EmitDecl 处理所有语句
-        EmitDecl(Builder, Context, Module, stmtNode->statement);
+        EmitDecl(stmtNode->statement);
     }
 
     // 验证模块完整性
     std::string verifyErrors;
     llvm::raw_string_ostream os(verifyErrors);
     if (llvm::verifyModule(*Module, &os)) {
-        throw CodegenError("Module verification failed:\n" + os.str());
+        throw std::runtime_error("Module verification failed:\n" + os.str());
     }
     return
 }
@@ -947,6 +1023,7 @@ void CodeGenerator::dumpIR() const {
 }
 
 //clang++-16 -std=c++17 -gdwarf-4 -O0 ir.cpp $(llvm-config-16 --cxxflags --ldflags --libs) -o ir
+/**
 int main() {
     llvm::LLVMContext Context;
     llvm::Module Module("literal_demo", Context);
@@ -962,82 +1039,82 @@ int main() {
 
     // 1. 整型字面量
     int8_t i8 = -42;
-    llvm::Value* li8 = EmitLiteral(Builder, Context, &Module, TYPE_INT8, &i8);
+    llvm::Value* li8 = EmitLiteralExpr(TYPE_INT8, &i8);
     llvm::Value* i8_alloca = Builder.CreateAlloca(Builder.getInt8Ty(), nullptr, "i8.addr");
     Builder.CreateStore(li8, i8_alloca);
 
     int16_t i16 = -32768;
-    llvm::Value* li16 = EmitLiteral(Builder, Context, &Module, TYPE_INT16, &i16);
+    llvm::Value* li16 = EmitLiteralExpr(TYPE_INT16, &i16);
     llvm::Value* i16_alloca = Builder.CreateAlloca(Builder.getInt16Ty(), nullptr, "i16.addr");
     Builder.CreateStore(li16, i16_alloca);
 
     int32_t i32 = 2147483647;
-    llvm::Value* li32 = EmitLiteral(Builder, Context, &Module, TYPE_INT32, &i32);
+    llvm::Value* li32 = EmitLiteralExpr(TYPE_INT32, &i32);
     llvm::Value* i32_alloca = Builder.CreateAlloca(Builder.getInt32Ty(), nullptr, "i32.addr");
     Builder.CreateStore(li32, i32_alloca);
 
     int64_t i64 = -9223372036854775807LL;
-    llvm::Value* li64 = EmitLiteral(Builder, Context, &Module, TYPE_INT64, &i64);
+    llvm::Value* li64 = EmitLiteralExpr(TYPE_INT64, &i64);
     llvm::Value* i64_alloca = Builder.CreateAlloca(Builder.getInt64Ty(), nullptr, "i64.addr");
     Builder.CreateStore(li64, i64_alloca);
 
     // 2. 无符号整型字面量
     uint8_t u8 = 255;
-    llvm::Value* lu8 = EmitLiteral(Builder, Context, &Module, TYPE_UINT8, &u8);
+    llvm::Value* lu8 = EmitLiteralExpr(TYPE_UINT8, &u8);
     llvm::Value* u8_alloca = Builder.CreateAlloca(Builder.getInt8Ty(), nullptr, "u8.addr");
     Builder.CreateStore(lu8, u8_alloca);
 
     uint16_t u16 = 65535;
-    llvm::Value* lu16 = EmitLiteral(Builder, Context, &Module, TYPE_UINT16, &u16);
+    llvm::Value* lu16 = EmitLiteralExpr(TYPE_UINT16, &u16);
     llvm::Value* u16_alloca = Builder.CreateAlloca(Builder.getInt16Ty(), nullptr, "u16.addr");
     Builder.CreateStore(lu16, u16_alloca);
 
     uint32_t u32 = 4294967295;
-    llvm::Value* lu32 = EmitLiteral(Builder, Context, &Module, TYPE_UINT32, &u32);
+    llvm::Value* lu32 = EmitLiteralExpr(TYPE_UINT32, &u32);
     llvm::Value* u32_alloca = Builder.CreateAlloca(Builder.getInt32Ty(), nullptr, "u32.addr");
     Builder.CreateStore(lu32, u32_alloca);
 
     uint64_t u64 = 18446744073709551615ULL;
-    llvm::Value* lu64 = EmitLiteral(Builder, Context, &Module, TYPE_UINT64, &u64);
+    llvm::Value* lu64 = EmitLiteralExpr(TYPE_UINT64, &u64);
     llvm::Value* u64_alloca = Builder.CreateAlloca(Builder.getInt64Ty(), nullptr, "u64.addr");
     Builder.CreateStore(lu64, u64_alloca);
 
     // 3. 浮点数字面量
     uint16_t f16_bits = 0x3C00; // 1.0 in half precision
-    llvm::Value* lf16 = EmitLiteral(Builder, Context, &Module, TYPE_FLOAT16, &f16_bits);
+    llvm::Value* lf16 = EmitLiteralExpr(TYPE_FLOAT16, &f16_bits);
     llvm::Value* f16_alloca = Builder.CreateAlloca(Builder.getHalfTy(), nullptr, "f16.addr");
     Builder.CreateStore(lf16, f16_alloca);
 
     float f32 = 3.1415926f;
-    llvm::Value* lf32 = EmitLiteral(Builder, Context, &Module, TYPE_FLOAT32, &f32);
+    llvm::Value* lf32 = EmitLiteralExpr(TYPE_FLOAT32, &f32);
     llvm::Value* f32_alloca = Builder.CreateAlloca(Builder.getFloatTy(), nullptr, "f32.addr");
     Builder.CreateStore(lf32, f32_alloca);
 
     double f64 = 2.718281828459045;
-    llvm::Value* lf64 = EmitLiteral(Builder, Context, &Module, TYPE_FLOAT64, &f64);
+    llvm::Value* lf64 = EmitLiteralExpr(TYPE_FLOAT64, &f64);
     llvm::Value* f64_alloca = Builder.CreateAlloca(Builder.getDoubleTy(), nullptr, "f64.addr");
     Builder.CreateStore(lf64, f64_alloca);
 
     // 4. 字符串字面量
     const char* str = "Hello LLVM! 你好！";
-    llvm::Value* lstr = EmitLiteral(Builder, Context, &Module, TYPE_STRING, str);
+    llvm::Value* lstr = EmitLiteralExpr(TYPE_STRING, str);
     llvm::Value* str_alloca = Builder.CreateAlloca(Builder.getInt8PtrTy(), nullptr, "str.addr");
     Builder.CreateStore(lstr, str_alloca);
 
     // 5. 字符字面量
     char ch = 'A';
-    llvm::Value* lch = EmitLiteral(Builder, Context, &Module, TYPE_CHAR, &ch);
+    llvm::Value* lch = EmitLiteralExpr(TYPE_CHAR, &ch);
     llvm::Value* ch_alloca = Builder.CreateAlloca(Builder.getInt8Ty(), nullptr, "ch.addr");
     Builder.CreateStore(lch, ch_alloca);
 
     // 6. 布尔字面量
     bool b = true;
-    llvm::Value* lbool = EmitLiteral(Builder, Context, &Module, TYPE_BOOLEAN, &b);
+    llvm::Value* lbool = EmitLiteralExpr(TYPE_BOOLEAN, &b);
     llvm::Value* bool_alloca = Builder.CreateAlloca(Builder.getInt1Ty(), nullptr, "bool.addr");
     Builder.CreateStore(lbool, bool_alloca);
 
     // 7. NULL字面量
-    llvm::Value* lnull = EmitLiteral(Builder, Context, &Module, TYPE_PTR, nullptr);
+    llvm::Value* lnull = EmitLiteralExpr(TYPE_PTR, nullptr);
     llvm::Value* null_alloca = Builder.CreateAlloca(Builder.getInt8PtrTy(), nullptr, "null.addr");
     Builder.CreateStore(lnull, null_alloca);
 
@@ -1051,66 +1128,6 @@ int main() {
     }
 
     Module.print(llvm::outs(), nullptr);
-    
-    // ========================变量测试===========================
-    llvm::LLVMContext Context1;
-    llvm::Module Module1("var_decl_demo", Context1);
-    llvm::IRBuilder<> Builder1(Context1);
-
-    // 创建示例函数
-    llvm::FunctionType* funcType1 = llvm::FunctionType::get(Builder1.getVoidTy(), false);
-    llvm::Function* func1 = llvm::Function::Create(funcType1, llvm::Function::ExternalLinkage, "test_vars", Module1);
-    llvm::BasicBlock* entry1 = llvm::BasicBlock::Create(Context1, "entry", func1);
-    Builder1.SetInsertPoint(entry1);
-
-    // 示例1：声明可修改的int32变量
-    int32_t varValue1 = 42;
-    VarDecl varDecl1 = {"myVar", VAR_TYPE_VARIABLE, TYPE_INT32, &varValue1};
-    EmitVarDecl(Builder1, Context1, &Module1, varDecl1);
-
-    // 示例2：声明浮点常量
-    float constValue1 = 3.14f;
-    VarDecl varDecl2 = {"PI", VAR_TYPE_CONSTANT, TYPE_FLOAT32, &constValue1};
-    EmitVarDecl(Builder1, Context1, &Module1, varDecl2);
-
-    // 示例3：声明字符串变量
-    const char* strValue1 = "Hello";
-    VarDecl varDecl3 = {"greeting", VAR_TYPE_VARIABLE, TYPE_STRING, strValue1};
-    EmitVarDecl(Builder1, Context1, &Module1, varDecl3);
-
-    Builder1.CreateRetVoid();
-
-    // 验证并打印
-    if (llvm::verifyModule(Module1, &llvm::errs())) {
-        std::cerr << "Error verifying module!\n";
-        return 1;
-    }
-
-    Module1.print(llvm::outs(), nullptr);
-
-    // ========================函数测试===========================
-    llvm::LLVMContext Context2;
-    llvm::Module Module2("func_decl_demo", Context2);
-    llvm::IRBuilder<> Builder2(Context2);
-
-    // 示例1：声明 int foo(int a, float& b)
-    FunctionDecl func21;
-    func21.name = "foo";
-    func21.returnType = TYPE_INT32;
-    func21.params = {
-        {"a", TYPE_INT32, false},
-        {"b", TYPE_FLOAT32, true}
-    };
-    llvm::Function* fooFunc = EmitFunctionDecl(Builder2, Context2, &Module2, func21);
-
-    // 示例2：声明 void bar(...)
-    FunctionDecl func22;
-    func22.name = "bar";
-    func22.returnType = TYPE_VOID;
-    func22.isVarArg = true;
-    llvm::Function* barFunc = EmitFunctionDecl(Builder2, Context2, &Module2, func22);
-
-    // 打印生成的IR
-    Module2.print(llvm::outs(), nullptr);
     return 0;
 }
+ */

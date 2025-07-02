@@ -1,8 +1,6 @@
 #ifndef CODEGEN_H
 #define CODEGEN_H
-#ifdef __cplusplus
-extern "C" {
-#endif
+
 #include <iostream>
 #include "Basic/LinkedList.h"
 #include "Frontend/Ast.h"
@@ -37,7 +35,6 @@ public:
     };
 
     /// @brief 构造函数
-    explicit CodeGenerator();
     explicit CodeGenerator(const std::string& moduleName);
 
     /// @brief 生成整个程序的LLVM IR
@@ -78,7 +75,7 @@ private:
     llvm::Value* EmitArrayAccessExpr(const ASTNode* expr);
     llvm::Value* EmitObjectAccessExpr(const ASTNode* expr);
     llvm::Value* EmitAnonymousFuncExpr(const ASTNode* expr);
-    llvm::Value* EmitExpr(ASTNode* expr);
+    llvm::Value* EmitExpr(const ASTNode* expr);
 
     llvm::Value* EmitContinueStmt();
     llvm::Value* EmitBreakStmt();
@@ -89,6 +86,7 @@ private:
     llvm::Value* EmitWhileStmt(const WhileStmt& whileStmt, llvm::Function* currentFunction);
     llvm::Value* EmitForStmt(const ForStmt& forStmt, llvm::Function* currentFunction);
     llvm::Value* EmitIfStmt(const IfStmt& ifStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitReturnStmt(const SimpleStmt& returnStmt, llvm::Function* currentFunction);
     llvm::Value* EmitStmt(ASTNode* stmt, llvm::Function* currentFunction);
 
     llvm::Value* EmitVarDecl(ASTNode *node);
@@ -106,9 +104,5 @@ private:
     llvm::FunctionType* ConvertFunctionType(llvm::Type* returnType,
                                 const std::vector<llvm::Type*>& paramTypes, bool isVarArg = false);
 };
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* CODEGEN_H */

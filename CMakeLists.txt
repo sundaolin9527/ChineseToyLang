@@ -25,6 +25,25 @@ if(NOT LLVM_PACKAGE_VERSION VERSION_EQUAL "16.0.6")
     message(WARNING "LLVM 16.0.6 recommended, found ${LLVM_PACKAGE_VERSION}")
 endif()
 
+if(LLVM_FOUND)
+    message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+    message(STATUS "LLVM include dir: ${LLVM_INCLUDE_DIRS}")
+    message(STATUS "LLVM libraries: ${LLVM_LIBRARIES}")
+
+    # 关键配置：将LLVM定义和路径传播到所有子项目
+    include_directories(${LLVM_INCLUDE_DIRS})
+    add_definitions(${LLVM_DEFINITIONS})
+    link_directories(${LLVM_LIBRARY_DIRS})
+
+    # 提取LLVM所有组件定义（重要！）
+    llvm_map_components_to_libnames(LLVM_LIBS
+        Core Support Analysis IRReader Linker
+        TransformUtils InstCombine ExecutionEngine MC
+    )
+else()
+    message(FATAL_ERROR "LLVM 16 not found but required")
+endif()
+
 # 子目录
 add_subdirectory(include)
 add_subdirectory(src)

@@ -337,9 +337,9 @@ ASTNode* parse_for_statement(Parser *parser) {
     
     // 更新部分
     if (parser->current_token->type != TOKEN_LEFT_PAREN) {
-        node->for_stmt.update = parse_expression(parser);
+        node->for_stmt.increase = parse_expression(parser);
     } else {
-        node->for_stmt.update = NULL;
+        node->for_stmt.increase = NULL;
     }
     
     if (parser->current_token->type != TOKEN_RIGHT_PAREN) {

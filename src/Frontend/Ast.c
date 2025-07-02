@@ -171,7 +171,7 @@ void free_ast_node(ASTNode *node) {
         case AST_FOR_STMT:
             free_ast_node(node->for_stmt.init);
             free_ast_node(node->for_stmt.condition);
-            free_ast_node(node->for_stmt.update);
+            free_ast_node(node->for_stmt.increase);
             free_ast_node(node->for_stmt.body);
             break;
             
@@ -391,7 +391,7 @@ void print_ast(ASTNode *node, int depth) {
             printf("FOR_STMT\n");
             print_ast(node->for_stmt.init, depth + 1);
             print_ast(node->for_stmt.condition, depth + 1);
-            print_ast(node->for_stmt.update, depth + 1);
+            print_ast(node->for_stmt.increase, depth + 1);
             print_ast(node->for_stmt.body, depth + 1);
             break;
             
