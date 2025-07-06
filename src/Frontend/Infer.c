@@ -6,8 +6,8 @@
 #define TYPE_COUNT (12)
 // 类型提升规则说明：
 // 1. 整数提升规则：
-//    - 相同位数的有符号与无符号运算时，生成无符号类型，否则向更大范围的无符号类型提升
-//    - 例如：INT8 + UINT16 -> INT32
+//    - 相同位数的有符号与无符号运算时，生成相同位数的无符号类型，否则向更大范围的无符号类型提升
+//    - 例如：INT8 + UINT16 -> UINT16
 // 2. 浮点提升规则：
 //    - 任何浮点与整数运算都向浮点类型提升
 //    - 浮点类型之间向更高精度提升
@@ -106,6 +106,7 @@ TypeKind infer_call_expr_type(TypeEnv *env, ASTNode* node) {
 
     Symbol* symbol = find_symbol_in_scope(env, node->call_expr.callee->identifier_expr.name);
     if (symbol != NULL && symbol->type == TYPE_FUNCTION) {
+        // todo(*), 实现需要CFG、runtime支持
         //return symbol->type->function.return_type;
     }
     return TYPE_ANY;
