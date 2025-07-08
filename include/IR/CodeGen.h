@@ -67,31 +67,31 @@ private:
     SymbolInfo* LookupSymbol(const std::string& name);
     
     // 各种AST节点的生成方法
-    llvm::Value* EmitLiteralExpr(TypeKind type, const void *value) ;
+    llvm::Value* EmitLiteralExpr(ASTNode* expr) ;
     llvm::Value* EmitIdentifierExpr(ASTNode* expr);
     llvm::Value* EmitBinaryExpr(ASTNode* expr);
-    llvm::Value* EmitAssignmentExpr(const ASTNode* expr);
-    llvm::Value* EmitCallExpr(const ASTNode* expr);
-    llvm::Value* EmitArrayAccessExpr(const ASTNode* expr);
-    llvm::Value* EmitObjectAccessExpr(const ASTNode* expr);
-    llvm::Value* EmitAnonymousFuncExpr(const ASTNode* expr);
-    llvm::Value* EmitExpr(const ASTNode* expr);
+    llvm::Value* EmitAssignmentExpr(ASTNode* expr);
+    llvm::Value* EmitCallExpr(ASTNode* expr);
+    llvm::Value* EmitArrayAccessExpr(ASTNode* expr);
+    llvm::Value* EmitObjectAccessExpr(ASTNode* expr);
+    llvm::Value* EmitAnonymousFuncExpr(ASTNode* expr);
+    llvm::Value* EmitExpr(ASTNode* expr);
 
     llvm::Value* EmitContinueStmt();
     llvm::Value* EmitBreakStmt();
-    llvm::Value* EmitBlockStmt(const StmtSequence& blockStmt, llvm::Function* currentFunction);
-    llvm::Value* EmitExportStmt(const Name& exportStmt, llvm::Function* currentFunction);
-    llvm::Value* EmitImportStmt(const Name& importStmt, llvm::Function* currentFunction);
-    llvm::Value* EmitExprStmt(const SimpleStmt& exprStmt, llvm::Function* currentFunction);
-    llvm::Value* EmitWhileStmt(const WhileStmt& whileStmt, llvm::Function* currentFunction);
-    llvm::Value* EmitForStmt(const ForStmt& forStmt, llvm::Function* currentFunction);
-    llvm::Value* EmitIfStmt(const IfStmt& ifStmt, llvm::Function* currentFunction);
-    llvm::Value* EmitReturnStmt(const SimpleStmt& returnStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitBlockStmt(StmtSequence& blockStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitExportStmt(Name& exportStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitImportStmt(Name& importStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitExprStmt(SimpleStmt& exprStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitWhileStmt(WhileStmt& whileStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitForStmt(ForStmt& forStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitIfStmt(IfStmt& ifStmt, llvm::Function* currentFunction);
+    llvm::Value* EmitReturnStmt(SimpleStmt& returnStmt, llvm::Function* currentFunction);
     llvm::Value* EmitStmt(ASTNode* stmt, llvm::Function* currentFunction);
 
     llvm::Value* EmitVarDecl(ASTNode *node);
     llvm::Function* EmitFunctionDecl(ASTNode* funcDecl);
-    llvm::Type* EmitStructOrUnionDecl(ASTNode *node, bool isPacked = false);
+    llvm::Type* EmitStructOrUnionDecl(ASTNode *node);
     llvm::Value* EmitDecl(ASTNode* decl, llvm::Function* currentFunction = nullptr);
 
     // 检查相关

@@ -1,6 +1,6 @@
 # 合并两个 add_library 调用
 add_library(IR STATIC
-    #CodeGen.cpp
+    CodeGen.cpp
     Pass.cpp
 )
 

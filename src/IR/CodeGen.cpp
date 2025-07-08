@@ -1,5 +1,6 @@
 #include <cassert>
 #include <stdexcept>
+#include <cstdlib>
 #include "IR/CodeGen.h"
 #include <llvm/Support/raw_ostream.h>
 
@@ -75,7 +76,7 @@ CodeGenerator::CodeGenerator(const std::string& moduleName)
 {
 }
 
-llvm::Value* CodeGenerator::EmitIfStmt(const IfStmt& ifStmt, llvm::Function* currentFunction) {
+llvm::Value* CodeGenerator::EmitIfStmt(IfStmt& ifStmt, llvm::Function* currentFunction) {
     // 1. 生成条件表达式的IR
     llvm::Value* condValue = EmitExpr(ifStmt.condition);
     
@@ -127,7 +128,7 @@ llvm::Value* CodeGenerator::EmitIfStmt(const IfStmt& ifStmt, llvm::Function* cur
     return nullptr;
 }
 
-llvm::Value* CodeGenerator::EmitForStmt(const ForStmt& forStmt, llvm::Function* currentFunction) {
+llvm::Value* CodeGenerator::EmitForStmt(ForStmt& forStmt, llvm::Function* currentFunction) {
     // 生成初始化代码
     if (forStmt.init) {
         EmitStmt(forStmt.init, currentFunction);
@@ -179,7 +180,7 @@ llvm::Value* CodeGenerator::EmitForStmt(const ForStmt& forStmt, llvm::Function* 
     return nullptr;
 }
 
-llvm::Value* CodeGenerator::EmitWhileStmt(const WhileStmt& whileStmt, llvm::Function* currentFunction) {
+llvm::Value* CodeGenerator::EmitWhileStmt(WhileStmt& whileStmt, llvm::Function* currentFunction) {
     // 创建基本块
     llvm::BasicBlock* condBB = llvm::BasicBlock::Create(Context, "while.cond", currentFunction);
     llvm::BasicBlock* bodyBB = llvm::BasicBlock::Create(Context, "while.body", currentFunction);
@@ -218,7 +219,7 @@ llvm::Value* CodeGenerator::EmitWhileStmt(const WhileStmt& whileStmt, llvm::Func
     return nullptr;
 }
 
-llvm::Value* CodeGenerator::EmitExprStmt(const SimpleStmt& exprStmt, llvm::Function* currentFunction) {
+llvm::Value* CodeGenerator::EmitExprStmt(SimpleStmt& exprStmt, llvm::Function* currentFunction) {
     if (exprStmt.expression) {
         // 生成表达式值，但忽略返回值（除非是块中最后一个表达式）
         return EmitExpr(exprStmt.expression);
@@ -226,7 +227,7 @@ llvm::Value* CodeGenerator::EmitExprStmt(const SimpleStmt& exprStmt, llvm::Funct
     return nullptr;
 }
 
-llvm::Value* CodeGenerator::EmitImportStmt(const Name& importStmt, llvm::Function* currentFunction) {
+llvm::Value* CodeGenerator::EmitImportStmt(Name& importStmt, llvm::Function* currentFunction) {
     // 导入语句主要在语义分析阶段处理
     // 这里可以生成必要的模块初始化代码
     std::string moduleName = importStmt.name;
@@ -245,7 +246,7 @@ llvm::Value* CodeGenerator::EmitImportStmt(const Name& importStmt, llvm::Functio
     return nullptr;
 }
 
-llvm::Value* CodeGenerator::EmitExportStmt(const Name& exportStmt, llvm::Function* currentFunction) {
+llvm::Value* CodeGenerator::EmitExportStmt(Name& exportStmt, llvm::Function* currentFunction) {
     // 设置符号的链接属性
     if (llvm::GlobalValue* gv = Module.getNamedValue(exportStmt.name)) {
         gv->setLinkage(llvm::GlobalValue::ExternalLinkage);
@@ -254,7 +255,7 @@ llvm::Value* CodeGenerator::EmitExportStmt(const Name& exportStmt, llvm::Functio
     return nullptr;
 }
 
-llvm::Value* CodeGenerator::EmitReturnStmt(const SimpleStmt& returnStmt, llvm::Function* currentFunction) {
+llvm::Value* CodeGenerator::EmitReturnStmt(SimpleStmt& returnStmt, llvm::Function* currentFunction) {
     if (returnStmt.expression) {
         llvm::Value* retVal = EmitExpr(returnStmt.expression);
         // 检查返回值类型是否匹配函数返回类型
@@ -274,7 +275,7 @@ llvm::Value* CodeGenerator::EmitReturnStmt(const SimpleStmt& returnStmt, llvm::F
     return nullptr; // return语句不会继续执行后续代码
 }
 
-llvm::Value* CodeGenerator::EmitBlockStmt(const StmtSequence& blockStmt, llvm::Function* currentFunction) {
+llvm::Value* CodeGenerator::EmitBlockStmt(StmtSequence& blockStmt, llvm::Function* currentFunction) {
     // 创建新的作用域
     EnterScope();
     
@@ -353,86 +354,116 @@ llvm::Value* CodeGenerator::EmitStmt(ASTNode* stmt, llvm::Function* currentFunct
     }
 }
 
-llvm::Value* CodeGenerator::EmitLiteralExpr(ASTNode* node) 
-{
-    if (node == nullptr) return nullptr;
-    
-    switch (node->inferred_type) {
-    // 整数类型
-    case TYPE_INT8:
-        return llvm::ConstantInt::get(Context, llvm::APInt(8, *(int8_t*)node->literal_expr.value, true));
-    case TYPE_INT16:
-        return llvm::ConstantInt::get(Context, llvm::APInt(16, *(int16_t*)node->literal_expr.value, true));
-    case TYPE_INT32:
-        return llvm::ConstantInt::get(Context, llvm::APInt(32, *(int32_t*)node->literal_expr.value, true));
-    case TYPE_INT64:
-        return llvm::ConstantInt::get(Context, llvm::APInt(64, *(int64_t*)node->literal_expr.value, true));
+template<typename T>
+llvm::Value* CreateIntegerConstant(llvm::LLVMContext& Context, const std::string& str, bool isSigned) {
+    T value;
+    if constexpr (std::is_same_v<T, bool>) {
+        value = (str == "true" || str == "1");
+    } else {
+        value = static_cast<T>(std::stoll(str));
+    }
+    return llvm::ConstantInt::get(Context, llvm::APInt(sizeof(T)*8, value, isSigned));
+}
 
-    // 无符号整数
-    case TYPE_UINT8:
-        return llvm::ConstantInt::get(Context, llvm::APInt(8, *(uint8_t*)node->literal_expr.value, false));
-    case TYPE_UINT16:
-        return llvm::ConstantInt::get(Context, llvm::APInt(16, *(uint16_t*)node->literal_expr.value, false));
-    case TYPE_UINT32:
-        return llvm::ConstantInt::get(Context, llvm::APInt(32, *(uint32_t*)node->literal_expr.value, false));
-    case TYPE_UINT64:
-        return llvm::ConstantInt::get(Context, llvm::APInt(64, *(uint64_t*)node->literal_expr.value, false));
-
-    // 浮点数
-    case TYPE_FLOAT16:
-        return llvm::ConstantFP::get(Context, llvm::APFloat(llvm::APFloat::IEEEhalf(), *(uint16_t*)node->literal_expr.value));
-    case TYPE_FLOAT32:
-        return llvm::ConstantFP::get(Context, llvm::APFloat(*(float*)node->literal_expr.value));
-    case TYPE_FLOAT64:
-        return llvm::ConstantFP::get(Context, llvm::APFloat(*(double*)node->literal_expr.value));
-
-    // 字符串
-    case TYPE_STRING: {
-        const char *str = (const char*)node->literal_expr.value;
-        llvm::Constant *StrConst = llvm::ConstantDataArray::getString(Context, str);
-
-        llvm::GlobalVariable *GV = new llvm::GlobalVariable(
-            Module,
-            StrConst->getType(),
-            true,
-            llvm::GlobalValue::PrivateLinkage,
-            StrConst,
-            "str.literal");
-
-        if (Builder.GetInsertBlock()) {
-        // 如果有插入点，生成 GEP 指令
-        return Builder.CreateInBoundsGEP(
-            GV->getValueType(),
-            GV,
-            {Builder.getInt32(0), Builder.getInt32(0)});
-        } else {
-        // 全局初始化，直接返回全局变量
-        return GV;
-        }
+llvm::Value* CodeGenerator::EmitLiteralExpr(ASTNode* node) {
+    if (node == nullptr || node->literal_expr.value.name == nullptr) {
+        return nullptr;
     }
 
-    // 字符
-    case TYPE_CHAR:
-        return llvm::ConstantInt::get(Context, llvm::APInt(8, *(char*)node->literal_expr.value, false));
+    const std::string literalStr = node->literal_expr.value.name;
+    try {
+        switch (node->inferred_type) {
+            // 整数类型
+            case TYPE_INT8:
+                return CreateIntegerConstant<int8_t>(Context, literalStr, true);
+            case TYPE_INT16:
+                return CreateIntegerConstant<int16_t>(Context, literalStr, true);
+            case TYPE_INT32:
+                return CreateIntegerConstant<int32_t>(Context, literalStr, true);
+            case TYPE_INT64:
+                return CreateIntegerConstant<int64_t>(Context, literalStr, true);
 
-    // 布尔值
-    case TYPE_BOOLEAN:
-        return llvm::ConstantInt::get(Context, llvm::APInt(1, *(bool*)node->literal_expr.value, false));
+            // 无符号整数
+            case TYPE_UINT8:
+                return CreateIntegerConstant<uint8_t>(Context, literalStr, false);
+            case TYPE_UINT16:
+                return CreateIntegerConstant<uint16_t>(Context, literalStr, false);
+            case TYPE_UINT32:
+                return CreateIntegerConstant<uint32_t>(Context, literalStr, false);
+            case TYPE_UINT64:
+                return CreateIntegerConstant<uint64_t>(Context, literalStr, false);
 
-    // NULL（指针）
-    case TYPE_PTR:
-        return llvm::ConstantPointerNull::get(Builder.getPtrTy());
+            // 浮点数
+            case TYPE_FLOAT16: {
+                float val = std::stof(literalStr);
+                llvm::APFloat apVal(val);  // 先构造一个 float 类型的 APFloat
+                bool losesInfo;
+                apVal.convert(llvm::APFloat::IEEEhalf(), 
+                            llvm::APFloat::rmNearestTiesToEven,
+                            &losesInfo);
+                return llvm::ConstantFP::get(Context, apVal);
+            }
+            case TYPE_FLOAT32: {
+                float val = std::stof(literalStr);
+                return llvm::ConstantFP::get(Context, llvm::APFloat(val));
+            }
+            case TYPE_FLOAT64: {
+                double val = std::stod(literalStr);
+                return llvm::ConstantFP::get(Context, llvm::APFloat(val));
+            }
 
-    default:
-        return nullptr;  // 其他
+            // 字符串
+            case TYPE_STRING: {
+                llvm::Constant* strConst = llvm::ConstantDataArray::getString(Context, literalStr);
+                llvm::GlobalVariable* GV = new llvm::GlobalVariable(
+                    Module,
+                    strConst->getType(),
+                    true,
+                    llvm::GlobalValue::PrivateLinkage,
+                    strConst,
+                    "str.literal");
+
+                if (Builder.GetInsertBlock()) {
+                    return Builder.CreateInBoundsGEP(
+                        GV->getValueType(),
+                        GV,
+                        {Builder.getInt32(0), Builder.getInt32(0)});
+                }
+                return GV;
+            }
+
+            // 字符
+            case TYPE_CHAR:
+                if (literalStr.size() >= 1) {
+                    return llvm::ConstantInt::get(Context, llvm::APInt(8, literalStr[0], false));
+                }
+                return llvm::ConstantInt::get(Context, llvm::APInt(8, 0, false));
+
+            // 布尔值
+            case TYPE_BOOLEAN:
+                return llvm::ConstantInt::get(Context, 
+                    llvm::APInt(1, (literalStr == "true" || literalStr == "1"), false));
+
+            // NULL（指针）
+            case TYPE_PTR:
+                return llvm::ConstantPointerNull::get(Builder.getPtrTy());
+
+            default:
+                return nullptr;
+        }
+    } catch (const std::exception& e) {
+        // 处理转换错误
+        return nullptr;
     }
 }
 
+/*
 llvm::Value* CodeGenerator::EmitIdentifierExpr(ASTNode* expr) {
     llvm::Value* var = LookupSymbol((expr->identifier_expr).name);
     if (!var) throw std::runtime_error("Undefined variable: " + (expr->identifier_expr).name);
     return Builder.CreateLoad(ConvertToLLVMType(expr->inferred_type), var, (expr->identifier_expr).name);
 }
+*/
 
 llvm::Value* CodeGenerator::EmitBinaryExpr(ASTNode* expr) {
     assert(expr->type == AST_BINARY_EXPR && "Expected binary expression node");
@@ -540,8 +571,8 @@ llvm::Value* CodeGenerator::EmitBinaryExpr(ASTNode* expr) {
                               std::to_string(expr->line));
     }
 }
-
-llvm::Value* CodeGenerator::EmitAssignmentExpr(const ASTNode* expr) {
+/*
+llvm::Value* CodeGenerator::EmitAssignmentExpr(ASTNode* expr) {
     const BinaryExpr& assign = expr->assignment_expr;
     if (!assign.left || assign.left->type != AST_IDENTIFIER_EXPR)
         throw std::runtime_error("Invalid assignment target at line " + std::to_string(expr->line));
@@ -554,8 +585,8 @@ llvm::Value* CodeGenerator::EmitAssignmentExpr(const ASTNode* expr) {
     return rhs;
 }
 
-/*
-llvm::Value* CodeGenerator::EmitCallExpr(const ASTNode* expr) {
+
+llvm::Value* CodeGenerator::EmitCallExpr(ASTNode* expr) {
     const CallExpr& call = expr->call_expr;
     llvm::Function* callee = Module.getFunction(call.callee->);
     if (!callee)
@@ -573,7 +604,7 @@ llvm::Value* CodeGenerator::EmitCallExpr(const ASTNode* expr) {
     return Builder.CreateCall(callee, args, "calltmp");
 }
 
-llvm::Value* CodeGenerator::EmitArrayAccessExpr(const ASTNode* expr) {
+llvm::Value* CodeGenerator::EmitArrayAccessExpr(ASTNode* expr) {
     const ArrayAccessExpr& arr = expr->array_access_expr;
     llvm::Value* array = EmitExpr(arr.array);
     llvm::Value* index = EmitExpr(arr.index);
@@ -586,7 +617,7 @@ llvm::Value* CodeGenerator::EmitArrayAccessExpr(const ASTNode* expr) {
         getLLVMType(expr->inferred_type), array, index, "arrayidx");
 }
 
-llvm::Value* CodeGenerator::EmitObjectAccessExpr(const ASTNode* expr) {
+llvm::Value* CodeGenerator::EmitObjectAccessExpr(ASTNode* expr) {
     const ObjectAccessExpr& obj = expr->object_access_expr;
     llvm::Value* object = EmitExpr(obj.object);
     
@@ -607,7 +638,7 @@ llvm::Value* CodeGenerator::EmitObjectAccessExpr(const ASTNode* expr) {
     return Builder.CreateStructGEP(structTy, object, memberIdx, obj.member_name + ".ptr");
 }
 
-llvm::Value* CodeGenerator::EmitAnonymousFuncExpr(const ASTNode* expr) {
+llvm::Value* CodeGenerator::EmitAnonymousFuncExpr(ASTNode* expr) {
     const AnoymousFuncExpr& anon = expr->anonymous_func_expr;
     
     llvm::FunctionType* funcType = llvm::FunctionType::get(
@@ -647,14 +678,14 @@ llvm::Value* CodeGenerator::EmitAnonymousFuncExpr(const ASTNode* expr) {
     return func;
 }
 */
-llvm::Value* CodeGenerator::EmitExpr(const ASTNode* expr) {
+llvm::Value* CodeGenerator::EmitExpr(ASTNode* expr) {
     if (!expr) return nullptr;
 
     switch (expr->type) {
         case AST_LITERAL_EXPR:    return EmitLiteralExpr(expr);
-        case AST_IDENTIFIER_EXPR: return EmitIdentifierExpr(expr);
+        //case AST_IDENTIFIER_EXPR: return EmitIdentifierExpr(expr);
         case AST_BINARY_EXPR:     return EmitBinaryExpr(expr);
-        case AST_ASSIGNMENT_EXPR: return EmitAssignmentExpr(expr);
+        //case AST_ASSIGNMENT_EXPR: return EmitAssignmentExpr(expr);
         //case AST_CALL_EXPR:       return EmitCallExpr(expr);
         //case AST_ARRAY_ACCESS_EXPR: return EmitArrayAccessExpr(expr);
         // AST_OBJECT_ACCESS_EXPR: return EmitObjectAccessExpr(expr);
@@ -672,7 +703,7 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
     ASTNode *value = decl.value;
     if (value == nullptr) return nullptr;
 
-    llvm::Type* ty = ConvertToLLVMType(Context, Builder, node->inferred_type);
+    llvm::Type* ty = ConvertToLLVMType(node->inferred_type);
     if (ty == nullptr)
     {
         std::cerr << "Unsupported or complex type for variable: " << node->inferred_type << "\n";
@@ -704,7 +735,7 @@ llvm::Function* CodeGenerator::EmitFunctionDecl(ASTNode *node) {
 
     FunctionDecl funcDecl = node->func_decl;                                    
     // 1. 转换返回类型
-    llvm::Type* retTy = ConvertToLLVMType(Context, Builder, node->inferred_type);
+    llvm::Type* retTy = ConvertToLLVMType(node->inferred_type);
     if (!retTy) {
         std::cerr << "Unsupported function return type: " << node->inferred_type << "\n";
         return nullptr;
@@ -713,7 +744,7 @@ llvm::Function* CodeGenerator::EmitFunctionDecl(ASTNode *node) {
     // 2. 转换参数类型
     std::vector<llvm::Type*> paramTypes;
     for (Parameter* param = funcDecl.params; param != nullptr; param = param->next) {
-        llvm::Type* ty = ConvertToLLVMType(Context, Builder, param->inferred_type);
+        llvm::Type* ty = ConvertToLLVMType(param->inferred_type);
         if (!ty) {
             std::cerr << "Unsupported function parameter type: " << param->inferred_type << "\n";
             return nullptr;
@@ -771,7 +802,7 @@ llvm::Function* CodeGenerator::EmitFunctionDecl(ASTNode *node) {
                     throw std::runtime_error("Non-void function missing return statement");
                 }
             }
-        } catch (const CodegenError& e) {
+        } catch (const std::exception& e) {
             // 发生错误时删除问题函数
             func->eraseFromParent();
             throw;
@@ -781,68 +812,55 @@ llvm::Function* CodeGenerator::EmitFunctionDecl(ASTNode *node) {
     return func;
 }
 
-llvm::Type* CodeGenerator::EmitStructOrUnionDecl(ASTNode *node, bool isPacked = false) {
-                                    
+llvm::Type* CodeGenerator::EmitStructOrUnionDecl(ASTNode *node) {
     if (!node) return nullptr;
-    assert((node->type == AST_STRUCT_DECL || node->type == AST_UNION_DECL) && "node->type != AST_STRUCT_OR_UNION_DECL");
+    assert((node->type == AST_STRUCT_DECL || node->type == AST_UNION_DECL) && 
+           "node->type != AST_STRUCT_OR_UNION_DECL");
+    
     StructOrUnionDecl decl = node->struct_or_union_decl;
+    bool isPacked = (node->type == AST_UNION_DECL);
 
-    // 1. 检查是否已生成该类型（防止递归无限循环）
+    // 检查是否已存在该类型
     if (decl.name.name) {
-        if (auto* existingType = Module.getTypeByName(decl.name.name)) {
+        // 方法1：直接尝试创建，如果已存在会返回现有类型
+        if (auto* existingType = llvm::StructType::getTypeByName(Context, decl.name.name)) {
             return existingType;
         }
     }
 
-    // 2. 创建不完整类型并注册（处理递归类型）
+    // 创建新类型
     llvm::StructType* structType = llvm::StructType::create(Context, decl.name.name);
-    if (decl.name.name) {
-        Module.getOrInsertType(decl.name.name, structType);
-    }
 
-    // 3. 收集成员类型
+    // 收集成员类型
     std::vector<llvm::Type*> memberTypes;
-    std::vector<std::string> memberNames;
-    
     for (const MemberList* member = decl.members; member != nullptr; member = member->next) {
         ASTNode *member_decl = member->decl;
         if (!member_decl) continue;
 
-        switch (member_decl->type) {
-            case AST_MEMBER_DECL: {
-                // 普通成员变量
-                llvm::Type* memberType = getLLVMType(Context, member_decl->inferred_type);
-                memberTypes.push_back(memberType);
-                memberNames.push_back(member_decl->member_decl.name);
-                break;
-            }
-            case AST_STRUCT_DECL: 
-            case AST_UNION_DECL: 
-            {
-                // 嵌套匿名结构体/联合体
-                StructOrUnionDecl nested = member_decl->struct_or_union_decl;
-                llvm::Type* nestedType = EmitStructOrUnionDecl(Context, Module, member_decl);
-                memberTypes.push_back(nestedType);
-                memberNames.push_back(nested.name.name ?  nested.name.name : "anon");
-                break;
-            }
-            default:
-                throw std::runtime_error("Unsupported member type in struct/union");
+        llvm::Type* memberType = nullptr;
+        if (member_decl->type == AST_MEMBER_DECL) {
+            memberType = ConvertToLLVMType(member_decl->inferred_type);
+        } else if (member_decl->type == AST_STRUCT_DECL || member_decl->type == AST_UNION_DECL) {
+            memberType = EmitStructOrUnionDecl(member_decl);
+        }
+
+        if (memberType) {
+            memberTypes.push_back(memberType);
         }
     }
 
-    // 4. 设置结构体主体
+    // 设置结构体主体
     structType->setBody(memberTypes, isPacked);
     return structType;
 }
 
-llvm::Value* CodeGenerator::EmitDecl(ASTNode* decl, llvm::Function* currentFunction = nullptr) {
+llvm::Value* CodeGenerator::EmitDecl(ASTNode* decl, llvm::Function* currentFunction) {
     if (!decl) return nullptr;
 
     switch (decl->type) {
         case AST_VAR_DECL: {
             // 处理变量声明（全局/局部）
-            return EmitVarDecl(decl, currentFunction);
+            return EmitVarDecl(decl);
         }
         case AST_FUNC_DECL: {
             // 处理函数声明/定义
@@ -851,7 +869,7 @@ llvm::Value* CodeGenerator::EmitDecl(ASTNode* decl, llvm::Function* currentFunct
         case AST_STRUCT_DECL: 
         case AST_UNION_DECL: {
             // 处理结构体/联合体定义
-            return EmitStructOrUnionDecl(Context, Module, decl);
+            EmitStructOrUnionDecl(decl);
         }
         default: {
             // 处理可执行语句（当currentFunction为nullptr时生成全局初始化代码）
@@ -862,23 +880,42 @@ llvm::Value* CodeGenerator::EmitDecl(ASTNode* decl, llvm::Function* currentFunct
 
 // 常量折叠优化
 llvm::Constant* CodeGenerator::ConstantFoldBinaryOp(Operator op, llvm::Constant* L, llvm::Constant* R, TypeKind type) {
-    if (type == TYPE_FLOAT32) {
+    if (type == TYPE_FLOAT32 || type == TYPE_FLOAT64) {
         auto* LF = llvm::cast<llvm::ConstantFP>(L);
         auto* RF = llvm::cast<llvm::ConstantFP>(R);
-        double lv = LF->getValueAPF().convertToDouble();
-        double rv = RF->getValueAPF().convertToDouble();
+        llvm::APFloat lv = LF->getValueAPF();
+        llvm::APFloat rv = RF->getValueAPF();
         
         switch (op) {
-            case OP_PLUS: return llvm::ConstantFP::get(L->getContext(), lv + rv);
-            case OP_MINUS: return llvm::ConstantFP::get(L->getContext(), lv - rv);
-            case OP_STAR: return llvm::ConstantFP::get(L->getContext(), lv * rv);
-            case OP_SLASH: return rv != 0 ? llvm::ConstantFP::get(L->getContext(), lv / rv) : nullptr;
-            case OP_LT:  return llvm::ConstantInt::get(L->getContext(), llvm::APInt(1, lv < rv));
-            case OP_LE:  return llvm::ConstantInt::get(L->getContext(), llvm::APInt(1, lv <= rv));
-            case OP_GT:  return llvm::ConstantInt::get(L->getContext(), llvm::APInt(1, lv > rv));
-            case OP_GE:  return llvm::ConstantInt::get(L->getContext(), llvm::APInt(1, lv >= rv));
-            case OP_EQ:  return llvm::ConstantInt::get(L->getContext(), llvm::APInt(1, lv == rv));
-            case OP_NE:  return llvm::ConstantInt::get(L->getContext(), llvm::APInt(1, lv != rv));
+            case OP_PLUS: {
+                lv.add(rv, llvm::APFloat::rmNearestTiesToEven);
+                return llvm::ConstantFP::get(L->getContext(), lv);
+            }
+            case OP_MINUS: {
+                lv.subtract(rv, llvm::APFloat::rmNearestTiesToEven);
+                return llvm::ConstantFP::get(L->getContext(), lv);
+            }
+            case OP_STAR: {
+                lv.multiply(rv, llvm::APFloat::rmNearestTiesToEven);
+                return llvm::ConstantFP::get(L->getContext(), lv);
+            }
+            case OP_SLASH: {
+                if (rv.isZero()) return nullptr;
+                lv.divide(rv, llvm::APFloat::rmNearestTiesToEven);
+                return llvm::ConstantFP::get(L->getContext(), lv);
+            }
+            case OP_LT:  return llvm::ConstantInt::get(L->getContext(), 
+                                  llvm::APInt(1, lv.compare(rv) == llvm::APFloat::cmpLessThan));
+            case OP_LE:  return llvm::ConstantInt::get(L->getContext(), 
+                                  llvm::APInt(1, lv.compare(rv) != llvm::APFloat::cmpGreaterThan));
+            case OP_GT:  return llvm::ConstantInt::get(L->getContext(), 
+                                  llvm::APInt(1, lv.compare(rv) == llvm::APFloat::cmpGreaterThan));
+            case OP_GE:  return llvm::ConstantInt::get(L->getContext(), 
+                                  llvm::APInt(1, lv.compare(rv) != llvm::APFloat::cmpLessThan));
+            case OP_EQ:  return llvm::ConstantInt::get(L->getContext(), 
+                                  llvm::APInt(1, lv.compare(rv) == llvm::APFloat::cmpEqual));
+            case OP_NE:  return llvm::ConstantInt::get(L->getContext(), 
+                                  llvm::APInt(1, lv.compare(rv) != llvm::APFloat::cmpEqual));
             default: return nullptr;
         }
     } else if (type == TYPE_INT32 || type == TYPE_BOOLEAN) {
@@ -924,8 +961,11 @@ void CodeGenerator::emitBoundsCheck(llvm::Value* array, llvm::Value* index, int 
         Builder.GetInsertBlock()->getParent());
 
     // 获取数组长度（假设数组有length字段）
-    llvm::Value* len = Builder.CreateStructGEP(array->getType()->getPointerElementType(), array, 0, "len.ptr");
-    len = Builder.CreateLoad(len, "len");
+    llvm::Value* len = Builder.CreateStructGEP(
+        array->getType()->getNonOpaquePointerElementType(), 
+        array, 
+        0, 
+        "len.ptr");
     
     // 比较索引和长度
     llvm::Value* cmp = Builder.CreateICmpULT(index, len, "bounds.cmp");
@@ -985,37 +1025,35 @@ llvm::Type* CodeGenerator::ConvertArrayType(llvm::Type* elementType, uint64_t le
     return llvm::ArrayType::get(elementType, length);
 }
 
-llvm::Type* CodeGenerator::ConvertStructType( const std::vector<llvm::Type*>& fieldTypes,
-                             const std::string& name = "", bool isPacked = false) {
+llvm::Type* CodeGenerator::ConvertStructType(const std::vector<llvm::Type*>& fieldTypes,
+                                           const std::string& name,
+                                           bool isPacked) {
     return llvm::StructType::create(Context, fieldTypes, name, isPacked);
 }
 
 llvm::FunctionType* CodeGenerator::ConvertFunctionType(llvm::Type* returnType,
                                       const std::vector<llvm::Type*>& paramTypes,
-                                      bool isVarArg = false) {
+                                      bool isVarArg) {
     return llvm::FunctionType::get(returnType, paramTypes, isVarArg);
 }
 
 void CodeGenerator::EmitProgram(ASTNode *node) {
-    if (!node) return nullptr;
+    if (!node) return;
     assert(node->type == AST_PROGRAM && "node->type != AST_PROGRAM");
 
     StmtSequence program = node->program;
-    // 单次遍历处理所有语句
     for (StatementList* stmtNode = program.statements; stmtNode != nullptr; stmtNode = stmtNode->next) {
         if (!stmtNode->statement) continue;
-
-        // 统一通过 EmitDecl 处理所有语句
         EmitDecl(stmtNode->statement);
     }
 
-    // 验证模块完整性
+    // 验证模块
     std::string verifyErrors;
     llvm::raw_string_ostream os(verifyErrors);
-    if (llvm::verifyModule(*Module, &os)) {
+    if (llvm::verifyModule(Module, &os)) {
         throw std::runtime_error("Module verification failed:\n" + os.str());
     }
-    return
+    return;
 }
 
 void CodeGenerator::dumpIR() const {
