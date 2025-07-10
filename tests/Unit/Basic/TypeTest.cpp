@@ -5,10 +5,9 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
-// 包含词法分析器和语法分析器的头文件
-#include "Frontend/Lexer.h"
-#include "Frontend/Parser.h"
+#include "Basic/Types.h"
 #include "Basic/Utils.h"
+#include "Frontend/Infer.h"
 
 int main(int argc, char *argv[]) {
     // 设置本地化环境以支持中文
@@ -30,23 +29,7 @@ int main(int argc, char *argv[]) {
     
     printf("从文件 '%s' 读取源代码...\n", argv[1]);
     printf("%s", source);
-
-    // 创建词法分析器
-    Lexer *lexer = init_lexer(source);
     
-    // 创建语法分析器
-    Parser *parser = init_parser(lexer);
-    
-    // 解析程序
-    ASTNode *program = parse_program(parser);
-    
-    // 打印AST
-    printf("\n生成的抽象语法树:\n");
-    print_ast(program, 0);
-    
-    // 释放内存
-    free_ast_node(program);
-    free_parser(&parser);
     free(source);
     
     return 0;

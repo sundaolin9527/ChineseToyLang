@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
     // 释放内存
     free_ast_node(program);
     free_parser(&parser);
+    free(lexer);
     free(source);
     
     return 0;
