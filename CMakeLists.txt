@@ -35,7 +35,7 @@ if(LLVM_FOUND)
     add_definitions(${LLVM_DEFINITIONS})
     link_directories(${LLVM_LIBRARY_DIRS})
 
-    # 提取LLVM所有组件定义（重要！）
+    # 提取LLVM所有组件定义
     llvm_map_components_to_libnames(LLVM_LIBS
         Core Support Analysis IRReader Linker
         TransformUtils InstCombine ExecutionEngine MC
@@ -51,5 +51,5 @@ add_subdirectory(app)
 
 if(BUILD_TESTING)
     enable_testing()
-    add_subdirectory(test)
+    add_subdirectory(tests)
 endif()
