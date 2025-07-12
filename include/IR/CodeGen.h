@@ -47,7 +47,7 @@ public:
 private:
     // LLVM核心组件
     llvm::LLVMContext Context;
-    llvm::Module Module;
+    std::unique_ptr<llvm::Module> Module;
     llvm::IRBuilder<> Builder;
     
     // 符号表相关, 和前端的符号表实现不一致，后面再优化

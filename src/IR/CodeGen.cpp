@@ -71,7 +71,7 @@ CodeGenerator::SymbolInfo* CodeGenerator::LookupSymbol(const std::string& name) 
 
 CodeGenerator::CodeGenerator(const std::string& moduleName)
     : Context(),
-      Module(moduleName, Context),
+      Module(std::make_unique<llvm::Module>(moduleName, Context)),
       Builder(Context)
 {
 }
@@ -235,11 +235,11 @@ llvm::Value* CodeGenerator::EmitImportStmt(Name& importStmt, llvm::Function* cur
     // 示例：生成对__import_<module>的调用
     llvm::FunctionType* importFuncType = llvm::FunctionType::get(
         llvm::Type::getVoidTy(Context), false);
-    llvm::Function* importFunc = Module.getFunction("__import_" + moduleName);
+    llvm::Function* importFunc = Module->getFunction("__import_" + moduleName);
     if (!importFunc) {
         importFunc = llvm::Function::Create(
             importFuncType, llvm::Function::ExternalLinkage,
-            "__import_" + moduleName, Module);
+            "__import_" + moduleName, *Module);
     }
     
     Builder.CreateCall(importFunc);
@@ -248,7 +248,7 @@ llvm::Value* CodeGenerator::EmitImportStmt(Name& importStmt, llvm::Function* cur
 
 llvm::Value* CodeGenerator::EmitExportStmt(Name& exportStmt, llvm::Function* currentFunction) {
     // 设置符号的链接属性
-    if (llvm::GlobalValue* gv = Module.getNamedValue(exportStmt.name)) {
+    if (llvm::GlobalValue* gv = Module->getNamedValue(exportStmt.name)) {
         gv->setLinkage(llvm::GlobalValue::ExternalLinkage);
         gv->setDSOLocal(true);
     }
@@ -416,7 +416,7 @@ llvm::Value* CodeGenerator::EmitLiteralExpr(ASTNode* node) {
             case TYPE_STRING: {
                 llvm::Constant* strConst = llvm::ConstantDataArray::getString(Context, literalStr);
                 llvm::GlobalVariable* GV = new llvm::GlobalVariable(
-                    Module,
+                    *Module,
                     strConst->getType(),
                     true,
                     llvm::GlobalValue::PrivateLinkage,
@@ -588,7 +588,7 @@ llvm::Value* CodeGenerator::EmitAssignmentExpr(ASTNode* expr) {
 
 llvm::Value* CodeGenerator::EmitCallExpr(ASTNode* expr) {
     const CallExpr& call = expr->call_expr;
-    llvm::Function* callee = Module.getFunction(call.callee->);
+    llvm::Function* callee = Module->getFunction(call.callee->);
     if (!callee)
         throw std::runtime_error("Unknown function: " + call.func_name + " at line " + std::to_string(expr->line));
 
@@ -648,7 +648,7 @@ llvm::Value* CodeGenerator::EmitAnonymousFuncExpr(ASTNode* expr) {
     
     llvm::Function* func = llvm::Function::Create(
         funcType, llvm::Function::PrivateLinkage, 
-        "lambda", Module);
+        "lambda", *Module);
     
     unsigned idx = 0;
     for (auto& arg : func->args()) {
@@ -695,38 +695,79 @@ llvm::Value* CodeGenerator::EmitExpr(ASTNode* expr) {
 }
 
 llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
-    if (!node) return nullptr;
-    assert(node->type == AST_VAR_DECL && "node->type != AST_VAR_DECL");
+    // 1. 参数校验
+    if (!node || node->type != AST_VAR_DECL) {
+        throw std::runtime_error("Invalid variable declaration node");
+    }
 
     VarDecl decl = node->var_decl;
-    // 1. 根据字面量类型获取LLVM类型, 没有value先不生成
-    ASTNode *value = decl.value;
-    if (value == nullptr) return nullptr;
+    if (!decl.name.name) {
+        throw std::runtime_error("Variable name is null at line " + 
+                              std::to_string(node->line));
+    }
 
+    // 2. 类型处理
     llvm::Type* ty = ConvertToLLVMType(node->inferred_type);
-    if (ty == nullptr)
-    {
-        std::cerr << "Unsupported or complex type for variable: " << node->inferred_type << "\n";
-        return nullptr;
+    if (!ty || ty->isVoidTy()) {
+        throw std::runtime_error("Unsupported variable type at line " +
+                              std::to_string(node->line));
     }
-    
-    assert(decl.name.name != nullptr && "decl.name.name is null");
 
-    // 2. 创建alloca指令（在栈上分配空间）
-    llvm::Value* alloc = Builder.CreateAlloca(ty, nullptr, decl.name.name);
+    // 3. 判断作用域（全局/局部）
+    bool isGlobal = !Builder.GetInsertBlock();
+    bool isConstant = (decl.var_type == VAR_TYPE_CONSTANT);
 
-    // 3. 处理初始化值
-    llvm::Value* initVal = EmitExpr(value);
-    Builder.CreateStore(initVal, alloc);
-
-    // 4. 如果是常量，标记为不可修改
-    if (decl.var_type == VAR_TYPE_CONSTANT) {
-        if (llvm::GlobalVariable* GV = llvm::dyn_cast<llvm::GlobalVariable>(alloc)) {
-            GV->setConstant(true);
+    // 4. 处理全局变量
+    if (isGlobal) {
+        // 全局变量必须用常量初始化（或零初始化）
+        llvm::Constant* initVal = llvm::Constant::getNullValue(ty);
+        if (decl.value) {
+            llvm::Value* v = EmitExpr(decl.value);
+            initVal = llvm::dyn_cast<llvm::Constant>(v);
+            if (!initVal) {
+                throw std::runtime_error("Global variable initializer must be constant at line " +
+                                      std::to_string(node->line));
+            }
         }
-    }
 
-    return alloc;
+        auto gv = new llvm::GlobalVariable(
+            *Module,                    // LLVM模块
+            ty,                        // 类型
+            isConstant,                // 是否常量
+            llvm::GlobalValue::InternalLinkage, // 链接类型
+            initVal,                   // 初始值
+            decl.name.name             // 变量名
+        );
+        
+        // 设置对齐
+        gv->setAlignment(llvm::Align(
+            Module->getDataLayout().getABITypeAlign(ty).value()
+        ));
+        return gv;
+    }
+    // 5. 处理局部变量
+    else {
+        // 创建栈分配
+        llvm::AllocaInst* alloc = Builder.CreateAlloca(
+            ty,
+            nullptr,                   // 数组大小
+            decl.name.name             // 变量名
+        );
+        
+        // 设置对齐
+        alloc->setAlignment(llvm::Align(
+            Module->getDataLayout().getABITypeAlign(ty).value()
+        ));
+
+        // 处理初始化
+        if (decl.value) {
+            Builder.CreateStore(EmitExpr(decl.value), alloc);
+        } else {
+            Builder.CreateStore(llvm::Constant::getNullValue(ty), alloc);
+        }
+
+        return alloc;
+    }
 }
 
 llvm::Function* CodeGenerator::EmitFunctionDecl(ASTNode *node) {
@@ -757,7 +798,7 @@ llvm::Function* CodeGenerator::EmitFunctionDecl(ASTNode *node) {
 
     // 4. 创建函数对象
     llvm::Function* func = llvm::Function::Create(
-        funcType, llvm::Function::ExternalLinkage, funcDecl.name.name, Module);
+        funcType, llvm::Function::ExternalLinkage, funcDecl.name.name, *Module);
 
     // 5. 设置参数名称
     unsigned idx = 0;
@@ -1050,14 +1091,14 @@ void CodeGenerator::EmitProgram(ASTNode *node) {
     // 验证模块
     std::string verifyErrors;
     llvm::raw_string_ostream os(verifyErrors);
-    if (llvm::verifyModule(Module, &os)) {
+    if (llvm::verifyModule(*Module, &os)) {
         throw std::runtime_error("Module verification failed:\n" + os.str());
     }
     return;
 }
 
 void CodeGenerator::dumpIR() const {
-    Module.print(llvm::outs(), nullptr);
+    Module->print(llvm::outs(), nullptr);
 }
 
 //clang++-16 -std=c++17 -gdwarf-4 -O0 ir.cpp $(llvm-config-16 --cxxflags --ldflags --libs) -o ir
@@ -1165,7 +1206,7 @@ int main() {
     return 1;
     }
 
-    Module.print(llvm::outs(), nullptr);
+    Module->print(llvm::outs(), nullptr);
     return 0;
 }
  */
