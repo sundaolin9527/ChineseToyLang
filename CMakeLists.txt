@@ -25,6 +25,14 @@ if(NOT LLVM_PACKAGE_VERSION VERSION_EQUAL "16.0.6")
     message(WARNING "LLVM 16.0.6 recommended, found ${LLVM_PACKAGE_VERSION}")
 endif()
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # Debug 或 RelWithDebInfo 模式下启用调试符号
+    if(CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+        add_compile_options(-gdwarf-4 -g)
+        add_link_options(-g)
+    endif()
+endif()
+
 if(LLVM_FOUND)
     message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
     message(STATUS "LLVM include dir: ${LLVM_INCLUDE_DIRS}")
