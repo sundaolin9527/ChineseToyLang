@@ -4,6 +4,16 @@
 #include "IR/CodeGen.h"
 #include <llvm/Support/raw_ostream.h>
 
+std::string CodeGenerator::getSafeGlobalVarName(char *name, const std::string &defaultPrefix) 
+{
+    if (name != nullptr && name[0] != '\0') {
+        // 如果名称有效，直接返回
+        return name;
+    }
+    // 否则生成唯一名称：defaultPrefix + 当前全局变量数量
+    return defaultPrefix + "_" + std::to_string(Module->getGlobalList().size());
+}
+
 // 循环上下文（用于处理break/continue）
 struct LoopContext {
     llvm::BasicBlock* continueBB;
@@ -456,13 +466,37 @@ llvm::Value* CodeGenerator::EmitLiteralExpr(ASTNode* node) {
     }
 }
 
-/*
+
 llvm::Value* CodeGenerator::EmitIdentifierExpr(ASTNode* expr) {
-    llvm::Value* var = LookupSymbol((expr->identifier_expr).name);
-    if (!var) throw std::runtime_error("Undefined variable: " + (expr->identifier_expr).name);
-    return Builder.CreateLoad(ConvertToLLVMType(expr->inferred_type), var, (expr->identifier_expr).name);
+    if (expr == nullptr) return nullptr;
+
+    bool isGlobal = !Builder.GetInsertBlock();
+    llvm::Type* ty = ConvertToLLVMType(expr->inferred_type);
+    if (!ty) {
+        throw std::runtime_error("Unsupported variable type at line " +
+                            std::to_string(expr->line));
+    }
+    if (isGlobal)
+    {
+        std::string varName(expr->identifier_expr.name);
+        llvm::Constant *c = Module->getOrInsertGlobal(varName, ty);
+        llvm::GlobalVariable* gv = llvm::dyn_cast<llvm::GlobalVariable>(c);
+        if (!gv) {
+            throw std::runtime_error("gv is nullptr");
+        }
+        return Builder.CreateLoad(ty, gv, varName);
+    }
+    else
+    {
+        std::string varName(expr->identifier_expr.name);
+        CodeGenerator::SymbolInfo* symbol = LookupSymbol(varName);
+        if (!symbol) throw std::runtime_error("Undefined variable: " + varName);
+        llvm::Value* var = symbol->value;
+        if (!var) throw std::runtime_error("Undefined variable: " + varName);
+        return Builder.CreateLoad(ty, var, varName);
+    }
 }
-*/
+
 
 llvm::Value* CodeGenerator::EmitBinaryExpr(ASTNode* expr) {
     assert(expr->type == AST_BINARY_EXPR && "Expected binary expression node");
@@ -677,14 +711,39 @@ llvm::Value* CodeGenerator::EmitAnonymousFuncExpr(ASTNode* expr) {
     return func;
 }
 */
+
+llvm::Value* CodeGenerator::EmitLHSExpr(ASTNode* expr) {
+    if (!expr) return nullptr;
+    switch (expr->type) {
+       case AST_IDENTIFIER_EXPR:   return EmitIdentifierExpr(expr);
+       default: throw std::runtime_error("Unsupported expression type at line " + std::to_string(expr->line));
+    }
+    return nullptr;
+}
+
+/**
+ * lhs = expr
+ */
+llvm::Value* CodeGenerator::EmitAssignmentExpr(ASTNode* expr) {
+    if (!expr) return nullptr;
+    if (expr->type != AST_ASSIGNMENT_EXPR) {
+        throw std::runtime_error("expr->type is not AST_ASSIGNMENT_EXPR");
+        return nullptr;
+    }
+    
+    llvm::Value* lhs = EmitLHSExpr(expr->assignment_expr.left);
+    llvm::Value* rhs = EmitExpr(expr->assignment_expr.right);
+    return Builder.CreateStore(rhs, lhs);
+}
+
 llvm::Value* CodeGenerator::EmitExpr(ASTNode* expr) {
     if (!expr) return nullptr;
 
     switch (expr->type) {
         case AST_LITERAL_EXPR:    return EmitLiteralExpr(expr);
-        //case AST_IDENTIFIER_EXPR: return EmitIdentifierExpr(expr);
+        case AST_IDENTIFIER_EXPR: return EmitIdentifierExpr(expr);
         case AST_BINARY_EXPR:     return EmitBinaryExpr(expr);
-        //case AST_ASSIGNMENT_EXPR: return EmitAssignmentExpr(expr);
+        case AST_ASSIGNMENT_EXPR: return EmitAssignmentExpr(expr);
         //case AST_CALL_EXPR:       return EmitCallExpr(expr);
         //case AST_ARRAY_ACCESS_EXPR: return EmitArrayAccessExpr(expr);
         // AST_OBJECT_ACCESS_EXPR: return EmitObjectAccessExpr(expr);
@@ -715,7 +774,6 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
     // 3. 判断作用域（全局/局部）
     bool isGlobal = !Builder.GetInsertBlock();
     bool isConstant = (decl.var_type == VAR_TYPE_CONSTANT);
-    //std::string varName(decl.name.name ? decl.name.name : "name_" + std::to_string(Module->getGlobalList().size())); 
     
     // 4. 处理全局变量
     if (isGlobal) {
@@ -731,8 +789,8 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
         }
 
         // 1. 使用 getOrInsertGlobal 安全获取或创建全局变量（避免重复定义）
-        std::string tmpName = "global_var_" + std::to_string(Module->getGlobalList().size());
-        llvm::Constant *c = Module->getOrInsertGlobal(tmpName, ty);
+        std::string varName = getSafeGlobalVarName(decl.name.name);
+        llvm::Constant *c = Module->getOrInsertGlobal(varName, ty);
         llvm::GlobalVariable* gv = llvm::dyn_cast<llvm::GlobalVariable>(c);
         if (gv != nullptr) {
             // 如果是新创建的变量，设置属性

@@ -67,6 +67,7 @@ private:
     SymbolInfo* LookupSymbol(const std::string& name);
     
     // 各种AST节点的生成方法
+    llvm::Value* EmitLHSExpr(ASTNode* expr);
     llvm::Value* EmitLiteralExpr(ASTNode* expr) ;
     llvm::Value* EmitIdentifierExpr(ASTNode* expr);
     llvm::Value* EmitBinaryExpr(ASTNode* expr);
@@ -103,6 +104,8 @@ private:
                                 const std::string& name = "", bool isPacked = false);
     llvm::FunctionType* ConvertFunctionType(llvm::Type* returnType,
                                 const std::vector<llvm::Type*>& paramTypes, bool isVarArg = false);
+
+    std::string getSafeGlobalVarName(char *name, const std::string &defaultPrefix = "var");
 };
 
 #endif /* CODEGEN_H */
