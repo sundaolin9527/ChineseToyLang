@@ -715,8 +715,8 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
     // 3. 判断作用域（全局/局部）
     bool isGlobal = !Builder.GetInsertBlock();
     bool isConstant = (decl.var_type == VAR_TYPE_CONSTANT);
-    //std::string varName(decl.name.name ? decl.name.name : "name"); // 需保证ssa命名, todo(*)
-
+    //std::string varName(decl.name.name ? decl.name.name : "name_" + std::to_string(Module->getGlobalList().size())); 
+    
     // 4. 处理全局变量
     if (isGlobal) {
         // 全局变量必须用常量初始化（或零初始化）
@@ -730,19 +730,23 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
             }
         }
 
-        auto gv = new llvm::GlobalVariable(
-            *Module,                    // LLVM模块
-            ty,                        // 类型
-            isConstant,                // 是否常量
-            llvm::GlobalValue::ExternalLinkage, // 链接类型
-            initVal                   // 初始值
-            //varName                    // 变量名
-        );
-        
-        // 设置对齐
-        gv->setAlignment(llvm::Align(
-            Module->getDataLayout().getABITypeAlign(ty).value()
-        ));
+        // 1. 使用 getOrInsertGlobal 安全获取或创建全局变量（避免重复定义）
+        std::string tmpName = "global_var_" + std::to_string(Module->getGlobalList().size());
+        llvm::Constant *c = Module->getOrInsertGlobal(tmpName, ty);
+        llvm::GlobalVariable* gv = llvm::dyn_cast<llvm::GlobalVariable>(c);
+        if (gv != nullptr) {
+            // 如果是新创建的变量，设置属性
+            if (!gv->hasInitializer()) {
+                gv->setLinkage(llvm::GlobalValue::ExternalLinkage);
+                gv->setConstant(isConstant);
+                gv->setInitializer(initVal);
+                gv->setAlignment(llvm::Align(Module->getDataLayout().getABITypeAlign(ty).value()));
+            }
+        } else {
+            // 错误处理
+            llvm::errs() << "Error: Expected a GlobalVariable\n";
+        }
+
         return gv;
     }
     // 5. 处理局部变量
