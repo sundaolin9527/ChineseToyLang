@@ -10,7 +10,7 @@
 using namespace llvm;
 int main(int argc, char *argv[]) {
     // 设置本地化环境以支持中文
-    /** 
+ 
     setlocale(LC_ALL, "");
     
     // 检查命令行参数
@@ -48,10 +48,8 @@ int main(int argc, char *argv[]) {
 
     // 释放内存
     free_ast_node(program);
-    free(lexer);
     free_parser(&parser);
     free(source);
-    */
 
     // 初始化 LLVM 环境
     LLVMContext context;

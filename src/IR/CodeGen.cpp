@@ -708,7 +708,7 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
 
     // 2. 类型处理
     llvm::Type* ty = ConvertToLLVMType(node->inferred_type);
-    if (!ty || ty->isVoidTy()) {
+    if (!ty) {
         throw std::runtime_error("Unsupported variable type at line " +
                               std::to_string(node->line));
     }
@@ -716,6 +716,7 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
     // 3. 判断作用域（全局/局部）
     bool isGlobal = !Builder.GetInsertBlock();
     bool isConstant = (decl.var_type == VAR_TYPE_CONSTANT);
+    std::string varName(decl.name.name ? decl.name.name : "name"); // 需保证ssa命名
 
     // 4. 处理全局变量
     if (isGlobal) {
@@ -734,9 +735,9 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
             *Module,                    // LLVM模块
             ty,                        // 类型
             isConstant,                // 是否常量
-            llvm::GlobalValue::InternalLinkage, // 链接类型
+            llvm::GlobalValue::ExternalLinkage, // 链接类型
             initVal,                   // 初始值
-            decl.name.name             // 变量名
+            varName                    // 变量名
         );
         
         // 设置对齐
@@ -751,7 +752,7 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
         llvm::AllocaInst* alloc = Builder.CreateAlloca(
             ty,
             nullptr,                   // 数组大小
-            decl.name.name             // 变量名
+            varName                    // 变量名
         );
         
         // 设置对齐
