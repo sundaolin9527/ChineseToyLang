@@ -716,7 +716,7 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
     // 3. 判断作用域（全局/局部）
     bool isGlobal = !Builder.GetInsertBlock();
     bool isConstant = (decl.var_type == VAR_TYPE_CONSTANT);
-    std::string varName(decl.name.name ? decl.name.name : "name"); // 需保证ssa命名
+    //std::string varName(decl.name.name ? decl.name.name : "name"); // 需保证ssa命名, todo(*)
 
     // 4. 处理全局变量
     if (isGlobal) {
@@ -736,8 +736,8 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
             ty,                        // 类型
             isConstant,                // 是否常量
             llvm::GlobalValue::ExternalLinkage, // 链接类型
-            initVal,                   // 初始值
-            varName                    // 变量名
+            initVal                   // 初始值
+            //varName                    // 变量名
         );
         
         // 设置对齐
@@ -751,8 +751,8 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
         // 创建栈分配
         llvm::AllocaInst* alloc = Builder.CreateAlloca(
             ty,
-            nullptr,                   // 数组大小
-            varName                    // 变量名
+            nullptr                   // 数组大小
+            //varName                    // 变量名
         );
         
         // 设置对齐
