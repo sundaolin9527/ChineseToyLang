@@ -358,7 +358,7 @@ template<typename T>
 llvm::Value* CreateIntegerConstant(llvm::LLVMContext& Context, const std::string& str, bool isSigned) {
     T value;
     if constexpr (std::is_same_v<T, bool>) {
-        value = (str == "true" || str == "1");
+        value = (str == "真");
     } else {
         value = static_cast<T>(std::stoll(str));
     }
@@ -419,9 +419,8 @@ llvm::Value* CodeGenerator::EmitLiteralExpr(ASTNode* node) {
                     *Module,
                     strConst->getType(),
                     true,
-                    llvm::GlobalValue::PrivateLinkage,
-                    strConst,
-                    "str.literal");
+                    llvm::GlobalValue::ExternalLinkage,
+                    strConst);
 
                 if (Builder.GetInsertBlock()) {
                     return Builder.CreateInBoundsGEP(
@@ -442,7 +441,7 @@ llvm::Value* CodeGenerator::EmitLiteralExpr(ASTNode* node) {
             // 布尔值
             case TYPE_BOOLEAN:
                 return llvm::ConstantInt::get(Context, 
-                    llvm::APInt(1, (literalStr == "true" || literalStr == "1"), false));
+                    llvm::APInt(1, (literalStr == "真"), false));
 
             // NULL（指针）
             case TYPE_PTR:
