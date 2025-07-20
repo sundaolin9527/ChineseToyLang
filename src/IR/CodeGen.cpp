@@ -466,34 +466,40 @@ llvm::Value* CodeGenerator::EmitLiteralExpr(ASTNode* node) {
     }
 }
 
-
 llvm::Value* CodeGenerator::EmitIdentifierExpr(ASTNode* expr) {
     if (expr == nullptr) return nullptr;
 
-    bool isGlobal = !Builder.GetInsertBlock();
     llvm::Type* ty = ConvertToLLVMType(expr->inferred_type);
     if (!ty) {
-        throw std::runtime_error("Unsupported variable type at line " +
-                            std::to_string(expr->line));
+        throw std::runtime_error("Unsupported variable type");
     }
-    if (isGlobal)
-    {
-        std::string varName(expr->identifier_expr.name);
-        llvm::Constant *c = Module->getOrInsertGlobal(varName, ty);
-        llvm::GlobalVariable* gv = llvm::dyn_cast<llvm::GlobalVariable>(c);
-        if (!gv) {
-            throw std::runtime_error("gv is nullptr");
+
+    std::string varName(expr->identifier_expr.name);
+
+    // 处理全局变量
+    if (!Builder.GetInsertBlock()) {
+        // 在全局范围内，只创建/获取全局变量
+        llvm::GlobalVariable* gv = llvm::cast<llvm::GlobalVariable>(
+            Module->getOrInsertGlobal(varName, ty));
+        
+        if (!gv->hasInitializer()) {
+            gv->setInitializer(llvm::Constant::getNullValue(ty));
         }
-        return Builder.CreateLoad(ty, gv, varName);
+        return gv;
     }
-    else
-    {
-        std::string varName(expr->identifier_expr.name);
+    else {
+        // 在函数内部，处理局部变量或加载全局变量
         CodeGenerator::SymbolInfo* symbol = LookupSymbol(varName);
         if (!symbol) throw std::runtime_error("Undefined variable: " + varName);
+        
         llvm::Value* var = symbol->value;
         if (!var) throw std::runtime_error("Undefined variable: " + varName);
-        return Builder.CreateLoad(ty, var, varName);
+        
+        // 如果是全局变量引用，创建加载指令
+        if (llvm::isa<llvm::GlobalVariable>(var)) {
+            return Builder.CreateLoad(ty, var, varName.c_str());
+        }
+        return var;
     }
 }
 
@@ -733,7 +739,20 @@ llvm::Value* CodeGenerator::EmitAssignmentExpr(ASTNode* expr) {
     
     llvm::Value* lhs = EmitLHSExpr(expr->assignment_expr.left);
     llvm::Value* rhs = EmitExpr(expr->assignment_expr.right);
-    return Builder.CreateStore(rhs, lhs);
+    
+    // 检查操作数是否有效
+    if (!lhs || !rhs) {
+        throw std::runtime_error("Invalid operands for store instruction");
+    }
+    
+    // 如果有插入点，创建存储指令
+    if (Builder.GetInsertBlock()) {
+        return Builder.CreateStore(rhs, lhs);
+    }
+    // 没有插入点时，返回RHS值
+    else {
+        return rhs;
+    }
 }
 
 llvm::Value* CodeGenerator::EmitExpr(ASTNode* expr) {
@@ -774,60 +793,48 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
     // 3. 判断作用域（全局/局部）
     bool isGlobal = !Builder.GetInsertBlock();
     bool isConstant = (decl.var_type == VAR_TYPE_CONSTANT);
-    
-    // 4. 处理全局变量
+
     if (isGlobal) {
-        // 全局变量必须用常量初始化（或零初始化）
+        // 全局变量必须用常量初始化
         llvm::Constant* initVal = llvm::Constant::getNullValue(ty);
         if (decl.value) {
-            llvm::Value* v = EmitExpr(decl.value);
-            initVal = llvm::dyn_cast<llvm::Constant>(v);
-            if (!initVal) {
-                throw std::runtime_error("Global variable initializer must be constant at line " +
+            // 检查是否是常量表达式
+            if (auto* constantExpr = llvm::dyn_cast<llvm::Constant>(EmitExpr(decl.value))) {
+                initVal = constantExpr;
+            } else {
+                throw std::runtime_error("Global variable initializer must be constant expression at line " +
                                       std::to_string(node->line));
             }
         }
 
-        // 1. 使用 getOrInsertGlobal 安全获取或创建全局变量（避免重复定义）
         std::string varName = getSafeGlobalVarName(decl.name.name);
-        llvm::Constant *c = Module->getOrInsertGlobal(varName, ty);
-        llvm::GlobalVariable* gv = llvm::dyn_cast<llvm::GlobalVariable>(c);
-        if (gv != nullptr) {
-            // 如果是新创建的变量，设置属性
-            if (!gv->hasInitializer()) {
-                gv->setLinkage(llvm::GlobalValue::ExternalLinkage);
-                gv->setConstant(isConstant);
-                gv->setInitializer(initVal);
-                gv->setAlignment(llvm::Align(Module->getDataLayout().getABITypeAlign(ty).value()));
-            }
-        } else {
-            // 错误处理
-            llvm::errs() << "Error: Expected a GlobalVariable\n";
-        }
-
-        return gv;
-    }
-    // 5. 处理局部变量
-    else {
-        // 创建栈分配
-        llvm::AllocaInst* alloc = Builder.CreateAlloca(
+        llvm::GlobalVariable* gv = new llvm::GlobalVariable(
+            *Module,
             ty,
-            nullptr                   // 数组大小
-            //varName                    // 变量名
+            isConstant,
+            llvm::GlobalValue::ExternalLinkage,
+            initVal,
+            varName
         );
-        
-        // 设置对齐
+        gv->setAlignment(llvm::Align(Module->getDataLayout().getABITypeAlign(ty).value()));
+        return gv;
+    } 
+    else {
+        // 局部变量处理保持不变
+        llvm::AllocaInst* alloc = Builder.CreateAlloca(ty, nullptr);
         alloc->setAlignment(llvm::Align(
             Module->getDataLayout().getABITypeAlign(ty).value()
         ));
 
-        // 处理初始化
         if (decl.value) {
+            // 确保在函数内部有有效插入点
+            if (!Builder.GetInsertBlock()) {
+                throw std::runtime_error("Cannot initialize local variable: no insertion point");
+            }
             Builder.CreateStore(EmitExpr(decl.value), alloc);
         } else {
             Builder.CreateStore(llvm::Constant::getNullValue(ty), alloc);
         }
-
         return alloc;
     }
 }
