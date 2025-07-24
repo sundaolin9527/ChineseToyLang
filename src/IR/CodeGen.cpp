@@ -611,20 +611,6 @@ llvm::Value* CodeGenerator::EmitBinaryExpr(ASTNode* expr) {
     }
 }
 /*
-llvm::Value* CodeGenerator::EmitAssignmentExpr(ASTNode* expr) {
-    const BinaryExpr& assign = expr->assignment_expr;
-    if (!assign.left || assign.left->type != AST_IDENTIFIER_EXPR)
-        throw std::runtime_error("Invalid assignment target at line " + std::to_string(expr->line));
-
-    llvm::Value* rhs = EmitExpr(assign.right);
-    llvm::Value* var = LookupSymbol(assign.left->identifier_expr.name);
-    if (!var) throw std::runtime_error("Undefined variable: " + assign.left->identifier_expr.name);
-    
-    Builder.CreateStore(rhs, var);
-    return rhs;
-}
-
-
 llvm::Value* CodeGenerator::EmitCallExpr(ASTNode* expr) {
     const CallExpr& call = expr->call_expr;
     llvm::Function* callee = Module->getFunction(call.callee->);
@@ -755,6 +741,74 @@ llvm::Value* CodeGenerator::EmitAssignmentExpr(ASTNode* expr) {
     }
 }
 
+llvm::Value* CodeGenerator::EmitUnaryExpr(ASTNode* expr) {
+    if (!expr) return nullptr;
+    if (expr->type != AST_UNARY_EXPR) {
+        throw std::runtime_error("Expected AST_UNARY_EXPR node");
+        return nullptr;
+    }
+
+    Operator op = expr->unary_expr.op;  // 操作符
+    ASTNode* child = expr->unary_expr.operand;   // 子表达式
+
+    llvm::Value* operand = EmitExpr(child);  // 递归生成子表达式的值
+    if (!operand) {
+        return nullptr;  // 子表达式生成失败
+    }
+
+    // 尝试常量折叠：如果操作数是常量，直接计算结果
+    if (llvm::Constant* const_operand = llvm::dyn_cast<llvm::Constant>(operand)) {
+        switch (op) {
+            case OP_PLUS:
+                // 正号操作直接返回操作数
+                return const_operand;
+            case OP_MINUS:
+                if (llvm::ConstantInt* int_val = llvm::dyn_cast<llvm::ConstantInt>(const_operand)) {
+                    return llvm::ConstantInt::get(int_val->getType(), -int_val->getSExtValue());
+                } else if (llvm::ConstantFP* fp_val = llvm::dyn_cast<llvm::ConstantFP>(const_operand)) {
+                    return llvm::ConstantFP::get(fp_val->getType(), -fp_val->getValueAPF().convertToDouble());
+                }
+                break;
+            case OP_NOT:
+                if (llvm::ConstantInt* int_val = llvm::dyn_cast<llvm::ConstantInt>(const_operand)) {
+                    return llvm::ConstantInt::get(int_val->getType(), !int_val->getSExtValue(), true);
+                } else if (llvm::ConstantFP* fp_val = llvm::dyn_cast<llvm::ConstantFP>(const_operand)) {
+                    // 对于浮点数，0.0为false，其他为true
+                    bool isZero = fp_val->getValueAPF().isZero();
+                    return llvm::ConstantInt::get(llvm::Type::getInt1Ty(Context), !isZero);
+                }
+                break;
+            default:
+                break;  // 非可折叠操作符，继续生成IR
+        }
+    }
+
+    // 非常量或无法折叠，生成IR指令
+    switch (op) {
+        case OP_PLUS:
+            // 正号操作直接返回操作数
+            return operand;
+        case OP_MINUS:
+            if (operand->getType()->isFPOrFPVectorTy()) {
+                return Builder.CreateFNeg(operand, "fneg_tmp");
+            } else {
+                return Builder.CreateNeg(operand, "neg_tmp");
+            }
+        case OP_NOT:
+            if (operand->getType()->isFPOrFPVectorTy()) {
+                // 浮点数逻辑非：比较是否等于0.0
+                llvm::Value* zero = llvm::ConstantFP::get(operand->getType(), 0.0);
+                llvm::Value* cmp = Builder.CreateFCmpOEQ(operand, zero, "cmp_zero");
+                return Builder.CreateNot(cmp, "not_tmp");
+            } else {
+                return Builder.CreateNot(operand, "not_tmp");
+            }
+        default:
+            throw std::runtime_error("Unknown unary operator");
+            return nullptr;
+    }
+}
+
 llvm::Value* CodeGenerator::EmitExpr(ASTNode* expr) {
     if (!expr) return nullptr;
 
@@ -763,6 +817,7 @@ llvm::Value* CodeGenerator::EmitExpr(ASTNode* expr) {
         case AST_IDENTIFIER_EXPR: return EmitIdentifierExpr(expr);
         case AST_BINARY_EXPR:     return EmitBinaryExpr(expr);
         case AST_ASSIGNMENT_EXPR: return EmitAssignmentExpr(expr);
+        case AST_UNARY_EXPR:      return EmitUnaryExpr(expr);
         //case AST_CALL_EXPR:       return EmitCallExpr(expr);
         //case AST_ARRAY_ACCESS_EXPR: return EmitArrayAccessExpr(expr);
         // AST_OBJECT_ACCESS_EXPR: return EmitObjectAccessExpr(expr);

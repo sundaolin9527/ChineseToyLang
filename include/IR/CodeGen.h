@@ -71,6 +71,7 @@ private:
     llvm::Value* EmitLiteralExpr(ASTNode* expr) ;
     llvm::Value* EmitIdentifierExpr(ASTNode* expr);
     llvm::Value* EmitBinaryExpr(ASTNode* expr);
+    llvm::Value* EmitUnaryExpr(ASTNode* expr); 
     llvm::Value* EmitAssignmentExpr(ASTNode* expr);
     llvm::Value* EmitCallExpr(ASTNode* expr);
     llvm::Value* EmitArrayAccessExpr(ASTNode* expr);
