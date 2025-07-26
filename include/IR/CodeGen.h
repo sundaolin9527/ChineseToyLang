@@ -2,7 +2,6 @@
 #define CODEGEN_H
 
 #include <iostream>
-#include "Basic/LinkedList.h"
 #include "Frontend/Ast.h"
 #include "Basic/Types.h"
 #include "llvm/IR/Constants.h"
@@ -23,17 +22,6 @@ namespace llvm {
 
 class CodeGenerator {
 public:
-    // 符号信息结构体
-    struct SymbolInfo {
-        llvm::Value* value; // LLVM IR值
-        llvm::Type* type;   // LLVM类型
-        bool isConst;       // 是否是常量
-        
-        // 构造函数
-        SymbolInfo(Node n, llvm::Value* v, llvm::Type* t, bool isConst = false)
-            : value(v), type(t), isConst(isConst) {}
-    };
-
     /// @brief 构造函数
     explicit CodeGenerator(const std::string& moduleName);
 
@@ -49,9 +37,20 @@ private:
     llvm::LLVMContext Context;
     std::unique_ptr<llvm::Module> Module;
     llvm::IRBuilder<> Builder;
-    
-    // 符号表相关, 和前端的符号表实现不一致，后面再优化
-    std::vector<std::unordered_map<std::string, SymbolInfo>> symbolTables;
+
+    // 符号信息结构体
+    struct SymbolInfo {
+        llvm::Value* value; // LLVM IR值
+        llvm::Type* type;   // LLVM类型
+        bool isConst;       // 是否是常量
+        
+        // 构造函数
+        SymbolInfo(llvm::Value* v, llvm::Type* t, bool isConst = false)
+            : value(v), type(t), isConst(isConst) {}
+    };
+
+    // 符号表结构：外层 vector 表示作用域层级，内层 vector 存储该层的符号
+    std::vector<std::vector<std::pair<std::string, SymbolInfo>>> symbolTables;
     
     /// @brief 进入新的作用域
     void EnterScope();

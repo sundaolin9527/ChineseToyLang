@@ -39,44 +39,62 @@ LoopContext* GetCurrentLoopContext() {
 
 // 进入新的作用域（新建一个符号表层）
 void CodeGenerator::EnterScope() {
-    symbolTables.emplace_back();  // 添加一个新的unordered_map作为当前作用域
+    symbolTables.push_back({}); // 添加一个空的符号表层级
 }
 
 // 离开当前作用域（移除最内层符号表）
 void CodeGenerator::ExitScope() {
-    if (!symbolTables.empty()) {
-        symbolTables.pop_back();
-    } else {
-        llvm::errs() << "Warning: Trying to exit non-existent scope\n";
+    if (symbolTables.empty()) {
+        return;
     }
+    symbolTables.pop_back(); // 移除当前作用域的符号表
+    return;
 }
 
 // 添加符号到当前作用域
 bool CodeGenerator::AddSymbol(const std::string& name, const SymbolInfo& info) {
     if (symbolTables.empty()) {
-        EnterScope();  // 确保至少有一个作用域
+        EnterScope(); // 如果没有作用域，自动创建一个
     }
 
-    auto& currentScope = symbolTables.back();
-    auto [iter, inserted] = currentScope.try_emplace(name, info);
-    
-    if (!inserted) {
-        llvm::errs() << "Error: Symbol '" << name << "' already defined in current scope\n";
-        return false;
+    // 检查当前作用域是否已存在同名符号
+    auto& current_scope_symbols = symbolTables.back();
+    auto it = std::find_if(
+        current_scope_symbols.begin(),
+        current_scope_symbols.end(),
+        [&name](const auto& pair) { return pair.first == name; }
+    );
+
+    if (it != current_scope_symbols.end()) {
+        return true; // 符号已存在
     }
+
+    // 添加符号到当前作用域（拷贝 info 并记录当前作用域层级）
+    current_scope_symbols.emplace_back(name, info);
     return true;
 }
 
 // 查找符号（从内到外逐层查找）
 CodeGenerator::SymbolInfo* CodeGenerator::LookupSymbol(const std::string& name) {
-    // 反向遍历符号表（从最内层到最外层）
+    if (symbolTables.empty()) {
+        return nullptr; // 符号表为空
+    }
+
+    // 从当前作用域向外层查找（反向遍历）
     for (auto it = symbolTables.rbegin(); it != symbolTables.rend(); ++it) {
-        auto found = it->find(name);
-        if (found != it->end()) {
-            return &found->second;  // 返回符号信息的指针
+        auto& scope_symbols = *it;
+        auto sym_it = std::find_if(
+            scope_symbols.begin(),
+            scope_symbols.end(),
+            [&name](const auto& pair) { return pair.first == name; }
+        );
+
+        if (sym_it != scope_symbols.end()) {
+            return &sym_it->second; // 返回 SymbolInfo 的指针
         }
     }
-    return nullptr;  // 未找到返回nullptr
+
+    return nullptr; // 未找到符号
 }
 
 CodeGenerator::CodeGenerator(const std::string& moduleName)
@@ -872,6 +890,8 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
             varName
         );
         gv->setAlignment(llvm::Align(Module->getDataLayout().getABITypeAlign(ty).value()));
+        
+        // 因为全局变量有自己的符号表管理，所以此处不加符号表了
         return gv;
     } 
     else {
@@ -890,6 +910,7 @@ llvm::Value* CodeGenerator::EmitVarDecl(ASTNode *node) {
         } else {
             Builder.CreateStore(llvm::Constant::getNullValue(ty), alloc);
         }
+        AddSymbol(decl.name.name, SymbolInfo(alloc, ty, isConstant));
         return alloc;
     }
 }
@@ -1206,12 +1227,14 @@ void CodeGenerator::EmitProgram(ASTNode *node) {
     if (!node) return;
     assert(node->type == AST_PROGRAM && "node->type != AST_PROGRAM");
 
+    EnterScope();
     StmtSequence program = node->program;
     for (StatementList* stmtNode = program.statements; stmtNode != nullptr; stmtNode = stmtNode->next) {
         if (!stmtNode->statement) continue;
         EmitDecl(stmtNode->statement);
     }
-
+    
+    ExitScope();
     // 验证模块
     std::string verifyErrors;
     llvm::raw_string_ostream os(verifyErrors);
