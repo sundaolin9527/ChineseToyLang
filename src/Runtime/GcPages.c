@@ -5,7 +5,7 @@
 static int block_pg_cnt = DEFAULT_BLOCK_PG_ALLOC;
 static size_t current_pg_count = 0;
 
-void jl_gc_init_page(void)
+void gc_init_page(void)
 {
     size_t jl_page_size = sysconf(_SC_PAGESIZE); // 默认系统页
     if (GC_PAGE_SZ * block_pg_cnt < jl_page_size)
