@@ -1,4 +1,5 @@
 #include <sys/mman.h>
+#include <unistd.h>
 #include "GcPages.h"
 
 static int block_pg_cnt = DEFAULT_BLOCK_PG_ALLOC;
